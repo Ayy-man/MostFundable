@@ -1,0 +1,6 @@
+{
+  "event_type": "ACCALERT",
+  "hook_id": "synthetic-hardening-hook",
+  "member_ref": "synthetic-member-ref",
+  "occurred_at": "2026-08-16T00:00:00.000Z"
+}

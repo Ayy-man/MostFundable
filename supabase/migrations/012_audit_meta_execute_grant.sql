@@ -1,0 +1,24 @@
+-- 012_audit_meta_execute_grant.sql
+--
+-- Migration 011 gave `authenticated` the insert grant and the
+-- `audit_log_actor_insert_lane_a` policy it needs to write its own attribution
+-- row, and the row still could not be written. `audit_log` carries
+--
+--   check constraint "audit_log_meta_valid" check (private.audit_meta_valid(meta))
+--
+-- and Postgres evaluates a check constraint as the CALLING role, not as the
+-- table owner. Phase 1 granted execute on the five `private.auth_*` helpers
+-- because policies call them, but not on this one, because before 011 nothing
+-- but the service role ever inserted into `audit_log`. So every insert from
+-- `authenticated` died at
+--
+--   ERROR:  permission denied for function audit_meta_valid   (SQLSTATE 42501)
+--
+-- reaching PATCH /api/org/settings as a 500 after the org update had already
+-- landed. Measured against the live stack on 2026-08-16, not inferred.
+--
+-- The grant leaks nothing. `private.audit_meta_valid` is `immutable`, takes a
+-- jsonb value the caller already holds, reads no table and returns a boolean;
+-- calling it tells you only whether your own payload is well formed.
+
+grant execute on function private.audit_meta_valid(jsonb) to authenticated;

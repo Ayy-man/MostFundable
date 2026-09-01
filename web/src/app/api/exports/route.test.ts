@@ -1,0 +1,3 @@
+import assert from "node:assert/strict"; import fs from "node:fs"; import path from "node:path"; import { describe, it } from "node:test";
+const source = fs.readFileSync(path.resolve(process.cwd(), "src/app/api/exports/route.ts"), "utf8");
+describe("export route", () => { it("authorizes before query parsing and returns the native stream", () => { assert.ok(source.indexOf('requireRole("platform_admin")') < source.indexOf("searchParams")); assert.match(source, /new Response\(descriptor\.stream/); assert.match(source, /content-disposition/); assert.doesNotMatch(source, /after\(/); assert.doesNotMatch(source, /\.from\(|\.select\(/); }); });

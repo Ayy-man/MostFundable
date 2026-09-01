@@ -1,0 +1,814 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-ink: var(--primary-ink);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --font-sans: var(--font-brand);
+  --font-serif: var(--font-newsreader);
+  --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-brand);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+}
+
+:root {
+  /* Shared motion scale. Usage, rather than numerical proximity, decides which
+     token a transition reads: controls are quick, navigational swaps are fast,
+     and spatial panels get the slower surface clock. */
+  --duration-stagger: 40ms;
+  --duration-micro: 80ms;
+  --duration-quick: 150ms;
+  --duration-fast: 250ms;
+  --duration-medium: 350ms;
+  --duration-slow: 400ms;
+  --duration-very-slow: 500ms;
+  --ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: ease-in-out;
+  --ease-out: ease-out;
+  --ease-linear: linear;
+  --distance-micro: 4px;
+  --distance-base: 8px;
+  --distance-medium: 12px;
+  --scale-large: 0.96;
+  --scale-medium: 0.97;
+  --scale-small: 0.98;
+  --scale-tiny: 0.99;
+  --blur-small: 2px;
+  --blur-medium: 3px;
+
+  /* Semantic primitives adapted from transitions.dev to Base UI's
+     data-starting-style / data-ending-style lifecycle. */
+  --dropdown-open-dur: var(--duration-fast);
+  --dropdown-close-dur: var(--duration-quick);
+  --dropdown-pre-scale: var(--scale-medium);
+  --dropdown-closing-scale: var(--scale-tiny);
+  --dropdown-ease: var(--ease-smooth-out);
+  --modal-open-dur: var(--duration-fast);
+  --modal-close-dur: var(--duration-quick);
+  --modal-scale: var(--scale-large);
+  --modal-ease: var(--ease-smooth-out);
+  --panel-open-dur: var(--duration-slow);
+  --panel-close-dur: var(--duration-medium);
+  --panel-blur: var(--blur-small);
+  --panel-ease: var(--ease-smooth-out);
+  --page-slide-dur: var(--duration-fast);
+  --page-slide-distance: var(--distance-base);
+  --page-blur: var(--blur-medium);
+  --page-slide-ease: var(--ease-smooth-out);
+  --pulse-dur: 1000ms;
+  --pulse-min: 0.55;
+  --reveal-dur: var(--duration-slow);
+  --reveal-blur: var(--blur-small);
+  --reveal-ease: var(--ease-in-out);
+  --tabs-dur: var(--duration-fast);
+  --tabs-ease: var(--ease-smooth-out);
+  --tt-in-dur: var(--duration-quick);
+  --tt-out-dur: 50ms;
+  --tt-scale: var(--scale-small);
+  --tt-delay: var(--duration-micro);
+  --tt-in-ease: var(--ease-out);
+  --tt-out-ease: var(--ease-out);
+  --acc-expand: var(--duration-fast);
+  --acc-collapse: var(--duration-fast);
+  --acc-ease: var(--ease-smooth-out);
+  --toast-open: var(--duration-medium);
+  --toast-close: var(--duration-fast);
+  --toast-distance: 16px;
+  --toast-blur: var(--blur-small);
+  --toast-scale: var(--scale-medium);
+  --toast-ease: var(--ease-smooth-out);
+
+  --brand-near-black: #0a0d12;
+  --brand-deep-navy: #0e1626;
+  --brand-electric-green: #39ff6a;
+  --brand-steel-blue: #1e2a3d;
+  --brand-light-gray: #e6ebf1;
+  --background: #f3f5f7;
+  --foreground: #0a0d12;
+  --card: #fafbfc;
+  --card-foreground: #0a0d12;
+  --popover: #fafbfc;
+  --popover-foreground: #0a0d12;
+  --primary: #39ff6a;
+  --primary-ink: #0b6b2a;
+  --primary-foreground: #0a0d12;
+  --secondary: #e6ebf1;
+  --secondary-foreground: #1e2a3d;
+  --muted: #edf0f3;
+  --muted-foreground: #1e2a3d;
+  --accent: #e7ffed;
+  --accent-foreground: #0a0d12;
+  --destructive: #af3832;
+  --border: rgba(30, 42, 61, 0.16);
+  --input: rgba(30, 42, 61, 0.55);
+  --ring: #0b6b2a;
+  --chart-1: #0b6b2a;
+  --chart-2: #1e2a3d;
+  --chart-3: #0e1626;
+  --chart-4: #66758a;
+  --chart-5: #42546a;
+  --radius: 0.5rem;
+  --sidebar: #e6ebf1;
+  --sidebar-foreground: #1e2a3d;
+  --sidebar-primary: #39ff6a;
+  --sidebar-primary-foreground: #0a0d12;
+  --sidebar-accent: #e7ffed;
+  --sidebar-accent-foreground: #0a0d12;
+  --sidebar-border: rgba(30, 42, 61, 0.16);
+  --sidebar-ring: #0b6b2a;
+  --consumer-ink: #0a0d12;
+  --consumer-muted: #1e2a3d;
+  --consumer-canvas: #f3f5f7;
+  --consumer-border: rgba(30, 42, 61, 0.16);
+  /* Product tokens shared by every surface.
+
+     These have no generic equivalent and used to live only in the consumer set, which meant the
+     shared chat foundation — mounted by the operator Inbox and the platform-admin AI Chat — was
+     painting itself out of one surface's palette. The consumer names below alias these, so nothing
+     on the consumer surface moves, and a surface that gets its own theme now overrides the token
+     the shared components actually read. */
+  --warning: #b98a1f;
+  --warning-border: #96701a;
+  --warning-ink: #654a0e;
+  /* Deep Navy. The design brief makes this the assistant's identity on all three surfaces. */
+  --assistant-ground: #0e1626;
+  /* Electric Green where it has to read on a dark ground, which is the only place it may be text. */
+  --accent-on-dark: #39ff6a;
+  /* A success mark. Same value as `--primary-ink` today and a different job, so it gets its own
+     name rather than borrowing one that is free to move. */
+  --success: #0b6b2a;
+  /* A surface that sits just above the canvas: the reader's own message ground. */
+  --surface-raised: #f0f2f4;
+  --surface-border: rgba(30, 42, 61, 0.2);
+  --surface-shadow: 0 1px 2px rgba(14, 22, 38, 0.08);
+
+  --consumer-surface-border: var(--surface-border);
+  --consumer-surface-shadow: var(--surface-shadow);
+  --consumer-accent: #39ff6a;
+  --consumer-accent-ink: #0b6b2a;
+  --consumer-accent-tint: #e7ffed;
+  --consumer-positive: var(--success);
+  --consumer-warning: var(--warning);
+  --consumer-warning-border: var(--warning-border);
+  --consumer-warning-ink: var(--warning-ink);
+  --consumer-negative: #af3832;
+  --consumer-connected: #0b6b2a;
+  --consumer-connected-on-dark: var(--accent-on-dark);
+  --consumer-rail: #e6ebf1;
+  --consumer-brand-tile: var(--assistant-ground);
+  --consumer-hero: var(--surface-raised);
+  --consumer-hero-panel: #e6ebf1;
+  --consumer-hero-ink: #0a0d12;
+  --consumer-hero-ink-hover: #0e1626;
+}
+
+[data-demo-theme="consumer"] {
+  --background: #f3f5f7;
+  --foreground: #0a0d12;
+  --card: #fafbfc;
+  --card-foreground: #0a0d12;
+  --popover: #fafbfc;
+  --popover-foreground: #0a0d12;
+  --primary: #39ff6a;
+  --primary-ink: #0b6b2a;
+  --primary-foreground: #0a0d12;
+  --secondary: #e6ebf1;
+  --secondary-foreground: #1e2a3d;
+  --muted: #edf0f3;
+  --muted-foreground: #1e2a3d;
+  --accent: #e7ffed;
+  --accent-foreground: #0a0d12;
+  --border: rgba(30, 42, 61, 0.16);
+  --input: rgba(30, 42, 61, 0.55);
+  --ring: #0b6b2a;
+  --sidebar: #e6ebf1;
+  --sidebar-foreground: #1e2a3d;
+  --sidebar-primary: #39ff6a;
+  --sidebar-primary-foreground: #0a0d12;
+  --sidebar-accent: #e7ffed;
+  --sidebar-accent-foreground: #0a0d12;
+  --sidebar-border: rgba(30, 42, 61, 0.16);
+  --sidebar-ring: #0b6b2a;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+}
+
+  html {
+    @apply bg-background font-sans;
+  }
+
+  body {
+    @apply min-h-dvh bg-background text-foreground;
+    font-feature-settings: "cv05" 1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+
+  ::selection {
+    background: color-mix(in oklch, var(--primary), transparent 76%);
+  }
+}
+
+@layer utilities {
+  .font-editorial {
+    font-family: var(--font-newsreader), Georgia, serif;
+  }
+
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .surface-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+    gap: 1rem;
+  }
+}
+
+@keyframes mf-opening-surface-enter {
+  from {
+    opacity: 0;
+    filter: blur(var(--page-blur));
+    transform: translateY(var(--page-slide-distance));
+  }
+
+  to {
+    opacity: 1;
+    filter: none;
+    transform: none;
+  }
+}
+
+@keyframes mf-opening-skeleton-exit {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes mf-skeleton-breathe {
+  0%,
+  100% {
+    opacity: 0.75;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+.mf-launch-skeleton {
+  animation: mf-opening-skeleton-exit var(--duration-quick) var(--ease-smooth-out) var(--duration-quick) both;
+}
+
+.mf-skeleton-shape {
+  animation: mf-skeleton-breathe var(--pulse-dur) var(--ease-in-out) infinite;
+}
+
+[data-app-opening="true"] [data-app-opening-surface] {
+  animation: mf-opening-surface-enter var(--page-slide-dur) var(--page-slide-ease) var(--duration-stagger) both;
+}
+
+/* In-surface navigation. Only the page's top-level regions move, which keeps
+   tables, forms, and reading content stable while still showing causality.
+
+   The page wrapper itself carries opacity and nothing else, deliberately. A
+   `transform` or a `filter` on it -- including the `blur(0)` and `translateY(0)`
+   an `animation-fill-mode: both` retains after the animation ends -- makes it
+   the containing block for every `position: fixed` descendant. All three shells
+   render their fixed layers inside this element (both floating launchers and
+   the toast live region), so a travelling wrapper drops them out of the
+   viewport for good. The travel lives on the children below, where the same
+   property cannot capture a fixed element it is not an ancestor of. */
+@keyframes mf-page-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* The page's top-level regions carry the travel the wrapper cannot. `to`
+   resolves to `none` rather than to `blur(0)`/`translateY(0)` so that the
+   retained fill leaves no filter or transform behind either. */
+@keyframes mf-page-region-enter {
+  from {
+    opacity: 0;
+    filter: blur(var(--page-blur));
+    transform: translateY(var(--page-slide-distance));
+  }
+  to {
+    opacity: 1;
+    filter: none;
+    transform: none;
+  }
+}
+
+@keyframes mf-state-enter {
+  from {
+    opacity: 0;
+    transform: translateY(var(--distance-micro));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes mf-route-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* A timeline band whose state just changed. It settles from the accessible
+   action ink back to its own hairline, which is how a row that was already on
+   screen shows that it is the row that moved -- without moving, and without
+   spending Electric Green on a border. `backwards` for the same reason the page
+   regions use it: a retained final keyframe on `border-color` is harmless, but
+   the fill mode is not worth having two opinions about in one file. */
+@keyframes mf-timeline-settle {
+  from { border-color: var(--success); }
+  to { border-color: var(--surface-border); }
+}
+
+[data-timeline-settle] {
+  animation: mf-timeline-settle var(--duration-fast) var(--ease-smooth-out) backwards;
+}
+
+/* The body of a checklist disclosure that just opened. It fades and settles two
+   pixels; it does not animate height. An open factor carries subtasks and 44px
+   controls, so a height animation would push every row beneath it for the length
+   of the transition on every toggle -- the one thing a checklist of fifteen rows
+   cannot afford. No fill mode: the body's resting state is the page's, and a
+   retained opacity on a region holding buttons is not worth the risk. */
+@keyframes mf-disclosure-reveal {
+  from { opacity: 0; transform: translateY(-2px); }
+  to { opacity: 1; transform: none; }
+}
+
+[data-motion-page] {
+  animation: mf-page-enter var(--page-slide-dur) var(--page-slide-ease) backwards;
+}
+
+[data-motion-role="active"],
+[data-motion-route] {
+  animation: mf-route-enter var(--duration-quick) var(--ease-smooth-out) both;
+}
+
+[data-motion-page] > :nth-child(2) { animation-delay: var(--duration-stagger); }
+[data-motion-page] > :nth-child(3) { animation-delay: calc(var(--duration-stagger) * 2); }
+[data-motion-page] > :nth-child(4) { animation-delay: calc(var(--duration-stagger) * 3); }
+[data-motion-page] > :nth-child(5) { animation-delay: calc(var(--duration-stagger) * 4); }
+[data-motion-page] > :nth-child(6) { animation-delay: calc(var(--duration-stagger) * 5); }
+[data-motion-page] > :nth-child(7) { animation-delay: calc(var(--duration-stagger) * 6); }
+
+/* `backwards`, not `both`. A finished animation with `both` retains its final
+   keyframe, and an animated `filter`/`transform` resolves that retained value to
+   `blur(0px)` / the identity matrix rather than to `none` -- measured in Chrome,
+   not assumed. Either one keeps the region a containing block for every fixed
+   descendant, permanently. `backwards` still covers the stagger delay and drops
+   the fill the moment the animation ends. */
+[data-motion-page] > * {
+  animation: mf-page-region-enter var(--duration-fast) var(--ease-smooth-out) backwards;
+}
+
+/* Persistent fixed layers are children of the page wrapper by DOM position
+   only; they are not page content. They neither re-enter on every in-surface
+   navigation nor surrender their own transitions to the entrance animation --
+   the toast owns transform and opacity for its enter and exit, and an entrance
+   animation would win over both. */
+[data-motion-page] > [data-app-opening-floating-action],
+[data-motion-page] > .t-toast,
+[data-motion-page] > [aria-live] {
+  animation: none;
+}
+
+/* Anchored surfaces: open from their trigger, close faster, and let Base UI
+   own presence, focus management, and pointer gating. */
+.t-dropdown {
+  opacity: 1;
+  scale: 1;
+  transform-origin: var(--transform-origin);
+  transition:
+    scale var(--dropdown-open-dur) var(--dropdown-ease),
+    opacity var(--dropdown-open-dur) var(--dropdown-ease);
+  will-change: scale, opacity;
+}
+.t-dropdown[data-starting-style] {
+  opacity: 0;
+  scale: var(--dropdown-pre-scale);
+}
+.t-dropdown[data-ending-style] {
+  opacity: 0;
+  scale: var(--dropdown-closing-scale);
+  transition-duration: var(--dropdown-close-dur);
+}
+
+/* Centered modal surfaces retain the Tailwind translate used for positioning;
+   individual `scale` avoids overwriting it. */
+.t-modal {
+  opacity: 1;
+  scale: 1;
+  transition:
+    scale var(--modal-open-dur) var(--modal-ease),
+    opacity var(--modal-open-dur) var(--modal-ease);
+  will-change: scale, opacity;
+}
+.t-modal[data-starting-style],
+.t-modal[data-ending-style] {
+  opacity: 0;
+  scale: var(--modal-scale);
+}
+.t-modal[data-ending-style] { transition-duration: var(--modal-close-dur); }
+
+[data-slot="dialog-overlay"],
+[data-slot="sheet-overlay"] {
+  opacity: 1;
+  transition: opacity var(--modal-open-dur) var(--modal-ease);
+}
+[data-slot="dialog-overlay"][data-starting-style],
+[data-slot="dialog-overlay"][data-ending-style],
+[data-slot="sheet-overlay"][data-starting-style],
+[data-slot="sheet-overlay"][data-ending-style] {
+  opacity: 0;
+}
+[data-slot="dialog-overlay"][data-ending-style],
+[data-slot="sheet-overlay"][data-ending-style] {
+  transition-duration: var(--modal-close-dur);
+}
+
+/* Drawers preserve their edge of origin. The enter carries a small blur; the
+   exit is shorter and drops the blur so dismissal never feels theatrical. */
+.t-sheet {
+  filter: none;
+  opacity: 1;
+  translate: 0 0;
+  transition:
+    translate var(--panel-open-dur) var(--panel-ease),
+    opacity var(--panel-open-dur) var(--panel-ease),
+    filter var(--panel-open-dur) var(--panel-ease);
+  will-change: translate, opacity, filter;
+}
+.t-sheet[data-side="left"][data-starting-style],
+.t-sheet[data-side="left"][data-ending-style] { translate: -100% 0; }
+.t-sheet[data-side="right"][data-starting-style],
+.t-sheet[data-side="right"][data-ending-style] { translate: 100% 0; }
+.t-sheet[data-side="top"][data-starting-style],
+.t-sheet[data-side="top"][data-ending-style] { translate: 0 -100%; }
+.t-sheet[data-side="bottom"][data-starting-style],
+.t-sheet[data-side="bottom"][data-ending-style] { translate: 0 100%; }
+.t-sheet[data-starting-style] {
+  filter: blur(var(--panel-blur));
+  opacity: 0;
+}
+.t-sheet[data-ending-style] {
+  opacity: 0;
+  transition-duration: var(--panel-close-dur);
+}
+
+/* Measured disclosures keep the existing Base UI height contract and add the
+   same cross-fade used by the transitions.dev accordion recipe. */
+.t-acc-panel {
+  filter: none;
+  opacity: 1;
+  transition:
+    height var(--acc-expand) var(--acc-ease),
+    opacity var(--acc-expand) var(--acc-ease),
+    filter var(--acc-expand) var(--acc-ease);
+}
+.t-acc-panel[data-starting-style],
+.t-acc-panel[data-ending-style] {
+  filter: blur(var(--blur-small));
+  opacity: 0;
+}
+.t-acc-panel[data-ending-style] {
+  transition-duration: var(--acc-collapse);
+}
+.t-acc [data-slot="collapsible-trigger"] svg {
+  transition: transform var(--acc-expand) var(--acc-ease);
+}
+
+/* Base UI's indicator supplies measured geometry, giving tabs the same sliding
+   pill behavior without custom event listeners or resize bookkeeping. */
+.t-tabs { position: relative; }
+.t-tabs-pill {
+  background: var(--background);
+  border-radius: var(--radius-md);
+  height: var(--active-tab-height);
+  left: 0;
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  translate: var(--active-tab-left) var(--active-tab-top);
+  transition:
+    translate var(--tabs-dur) var(--tabs-ease),
+    width var(--tabs-dur) var(--tabs-ease),
+    height var(--tabs-dur) var(--tabs-ease);
+  width: var(--active-tab-width);
+  will-change: translate, width;
+  z-index: 0;
+}
+.t-tabs[data-variant="line"] .t-tabs-pill {
+  background: var(--foreground);
+  border-radius: 999px;
+  height: 2px;
+  translate: var(--active-tab-left) calc(var(--active-tab-top) + var(--active-tab-height) + 3px);
+}
+.t-tab { position: relative; z-index: 1; }
+.t-tabs-panel[data-active] {
+  animation: mf-state-enter var(--duration-fast) var(--ease-in-out) backwards;
+}
+
+.t-tt {
+  opacity: 1;
+  scale: 1;
+  transform-origin: var(--transform-origin);
+  transition:
+    opacity var(--tt-in-dur) var(--tt-in-ease) var(--tt-delay),
+    scale var(--tt-in-dur) var(--tt-in-ease) var(--tt-delay);
+  will-change: opacity, scale;
+}
+.t-tt[data-starting-style] {
+  opacity: 0;
+  scale: var(--tt-scale);
+}
+.t-tt[data-ending-style] {
+  opacity: 0;
+  scale: var(--tt-scale);
+  transition-duration: var(--tt-out-dur);
+  transition-delay: 0ms;
+}
+
+.t-toast {
+  filter: blur(var(--toast-blur));
+  opacity: 0;
+  pointer-events: none;
+  /* Negated because the toast is anchored to the top of the viewport: it arrives from above the
+     corner it lands in and leaves the same way. The token stays a positive distance so it reads as
+     a magnitude; the sign belongs to the anchor, which is stated once, here. */
+  transform: translateY(calc(-1 * var(--toast-distance))) scale(var(--toast-scale));
+  transition:
+    opacity var(--toast-close) var(--toast-ease),
+    transform var(--toast-close) var(--toast-ease),
+    filter var(--toast-close) var(--toast-ease);
+  will-change: transform, opacity, filter;
+}
+.t-toast[data-open="true"] {
+  filter: blur(0);
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition-duration: var(--toast-open);
+}
+
+/* Controls enumerate only properties that should move. This replaces the
+   generic transition-all declarations inherited from generated primitives. */
+[data-slot="button"],
+[data-slot="badge"],
+[data-slot="input"],
+[data-slot="textarea"],
+[data-slot="select-trigger"],
+[data-slot="switch"],
+[data-slot="switch-thumb"],
+[data-slot="table-row"],
+[aria-pressed],
+[role="tab"],
+[data-motion-nav-item],
+button,
+a[href] {
+  transition-duration: var(--duration-quick);
+  transition-property: color, background-color, border-color, box-shadow, opacity, transform, translate;
+  transition-timing-function: var(--ease-smooth-out);
+}
+[data-slot="button"]:active:not([aria-haspopup]):not(:disabled) {
+  transform: translateY(1px) scale(0.99);
+}
+a[href]:active {
+  opacity: 0.76;
+}
+input[type="checkbox"],
+input[type="radio"],
+input[type="range"] {
+  transition:
+    accent-color var(--duration-quick) var(--ease-smooth-out),
+    box-shadow var(--duration-quick) var(--ease-smooth-out),
+    transform var(--duration-quick) var(--ease-smooth-out);
+}
+input[type="checkbox"]:active:not(:disabled),
+input[type="radio"]:active:not(:disabled) {
+  transform: scale(var(--scale-large));
+}
+[data-slot="switch-thumb"] {
+  transition-duration: var(--duration-fast);
+}
+[data-slot="progress-indicator"] {
+  transition: width var(--duration-fast) var(--ease-smooth-out);
+}
+[data-slot="skeleton"] {
+  animation: mf-skeleton-breathe var(--pulse-dur) var(--ease-in-out) infinite;
+}
+
+/* Repeated cards and newly inserted state messages get a small, consistent
+   response without moving dense data rows or changing layout. */
+.surface-grid > [data-slot="card"],
+[data-slot="card"] {
+  transition:
+    border-color var(--duration-quick) var(--ease-smooth-out),
+    box-shadow var(--duration-fast) var(--ease-smooth-out),
+    transform var(--duration-fast) var(--ease-smooth-out);
+}
+@media (hover: hover) and (pointer: fine) {
+  .surface-grid > [data-slot="card"]:hover {
+    transform: translateY(calc(var(--distance-micro) * -0.5));
+  }
+}
+[data-motion-state],
+[role="tabpanel"],
+[role="alert"] {
+  animation: mf-state-enter var(--duration-fast) var(--ease-smooth-out) backwards;
+}
+
+/* Navigation state has a persistent spatial marker; the marker and label move
+   together, so color is never the only active-state signal. */
+[data-motion-nav-item] { position: relative; }
+[data-motion-nav-item]::before {
+  background: currentColor;
+  border-radius: 999px;
+  content: "";
+  opacity: 0;
+  position: absolute;
+  transform: scaleY(0.45);
+  transition:
+    opacity var(--duration-quick) var(--ease-smooth-out),
+    transform var(--duration-fast) var(--ease-smooth-out);
+}
+[data-motion-nav-item][data-motion-indicator="primary"]::before {
+  background: var(--primary);
+}
+[data-motion-nav-item][aria-current="page"]::before {
+  opacity: 0.72;
+  transform: scaleY(1);
+}
+[data-motion-nav-item][data-motion-axis="vertical"]::before {
+  bottom: 0.7rem;
+  left: 0;
+  top: 0.7rem;
+  width: 2px;
+}
+[data-motion-nav-item][data-motion-axis="horizontal"]::before {
+  bottom: 0;
+  height: 2px;
+  left: 0.75rem;
+  right: 0.75rem;
+}
+
+[data-app-opening="true"] [data-app-opening-floating-action] {
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mf-launch-skeleton {
+    display: none;
+  }
+
+  [data-app-opening="true"] [data-app-opening-surface] {
+    animation: none;
+    opacity: 1;
+  }
+
+  [data-motion-page],
+  [data-motion-page] > *,
+  [data-motion-role="active"],
+  [data-motion-route],
+  [data-motion-state],
+  [data-timeline-settle],
+  [role="tabpanel"],
+  [role="alert"] {
+    animation: none !important;
+    filter: none !important;
+    opacity: 1;
+    transform: none !important;
+  }
+
+  /* The toast is a child of the page wrapper by DOM position only, so the
+     reset above would otherwise hold a dismissed toast on screen forever --
+     measured, not theorised: with reduce on, `data-open="false"` still computed
+     to `opacity: 1`. Visibility stays the toast's own business in both motion
+     modes; only its travel and blur are dropped. */
+  .t-toast {
+    opacity: 0;
+  }
+  .t-toast[data-open="true"] {
+    opacity: 1;
+  }
+
+  .t-dropdown,
+  .t-modal,
+  .t-sheet,
+  .t-acc-panel,
+  .t-tabs-pill,
+  .t-tab,
+  .t-tabs-panel,
+  .t-tt,
+  .t-toast,
+  [data-slot="button"],
+  [data-slot="switch-thumb"],
+  [data-slot="progress-indicator"],
+  input[type="checkbox"],
+  input[type="radio"],
+  input[type="range"],
+  button,
+  a[href],
+  [data-motion-nav-item],
+  [data-motion-nav-item]::before {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .t-dropdown,
+  .t-modal,
+  .t-sheet,
+  .t-acc-panel,
+  .t-tt {
+    filter: none !important;
+    scale: 1 !important;
+    translate: 0 0 !important;
+  }
+
+  [data-slot="skeleton"] {
+    animation: none !important;
+  }
+
+  .surface-grid > [data-slot="card"]:hover,
+  input[type="checkbox"]:active:not(:disabled),
+  input[type="radio"]:active:not(:disabled),
+  [data-slot="button"]:active:not([aria-haspopup]):not(:disabled) {
+    transform: none !important;
+  }
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

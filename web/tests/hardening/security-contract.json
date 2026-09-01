@@ -1,0 +1,44 @@
+{
+  "route": "/icon.svg",
+  "required": [
+    {
+      "name": "referrer-policy",
+      "predicate": { "type": "exact", "value": "strict-origin-when-cross-origin" },
+      "environments": ["local", "deployed"]
+    },
+    {
+      "name": "x-content-type-options",
+      "predicate": { "type": "exact", "value": "nosniff" },
+      "environments": ["local", "deployed"]
+    },
+    {
+      "name": "x-frame-options",
+      "predicate": { "type": "exact", "value": "DENY" },
+      "environments": ["local", "deployed"]
+    },
+    {
+      "name": "content-security-policy",
+      "predicate": { "type": "includes", "value": "default-src 'self'" },
+      "environments": ["local", "deployed"]
+    },
+    {
+      "name": "strict-transport-security",
+      "predicate": { "type": "includes", "value": "max-age=" },
+      "environments": ["local", "deployed"]
+    }
+  ],
+  "knownFindings": [
+    {
+      "id": "CURRENT-CSP-ABSENT",
+      "header": "content-security-policy",
+      "status": "OPEN",
+      "owner": "integration"
+    },
+    {
+      "id": "CURRENT-HSTS-ABSENT",
+      "header": "strict-transport-security",
+      "status": "OPEN",
+      "owner": "integration"
+    }
+  ]
+}

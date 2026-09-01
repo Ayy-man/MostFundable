@@ -1,0 +1,31 @@
+-- `plan_rejected` meant two opposite things, and a production diagnosis had to go around it.
+--
+-- **The defect.** `createAndPersistResult` wrapped the whole plan step in a blanket catch that
+-- turned any throw into `plan_rejected`. `runPlanEngine` raises exactly one error of its own —
+-- `Error('PLAN_REJECTED')`, after its internal candidate loop has run and neither the supervisor
+-- nor the deterministic evaluator approved. Everything else that can go wrong escapes
+-- `driver.generateCandidate` as a raw error: a 429 from OpenRouter, a socket reset, a truncated
+-- body, a malformed envelope. All of it landed on the same durable code.
+--
+-- So on 2026-08-22 two stuck hosted jobs read `error_code = plan_rejected`, and that value was
+-- evidence of neither cause. Establishing which one it actually was took a separate correlation
+-- against `eval_runs` — checking whether the attempts had written supervisor/deterministic pairs
+-- at all. A durable code that cannot answer the first question asked of it is not doing its job.
+--
+-- **The split.** `plan_rejected` keeps its name and narrows to what the name says: the engine ran
+-- and refused every candidate. `plan_unavailable` is the new value: no candidate was produced, so
+-- there was nothing to judge.
+--
+-- **Both stay retryable, deliberately.** It is tempting to read "the evaluator refuses every
+-- candidate" as terminal, and as the code stands that would be wrong twice over. The classification
+-- is a one-line inference from a caught error's message, so anything that ever perturbs that
+-- sentinel silently reclassifies transport faults as permanent — and a single transient 503 would
+-- then kill a consumer's analysis for good, with no path back except a person resurrecting it by
+-- hand. A retryable job self-heals the moment the prompt or evaluator seam is corrected. This is a
+-- diagnosability change and nothing else; do not "optimize" either code to non-retryable without
+-- first giving the worker a signal stronger than a string comparison.
+
+-- Outside the transaction: PostgreSQL forbids using a new enum value in the transaction that adds
+-- it, and keeping the addition separate makes that impossible to get wrong later. Migration 378
+-- added `pull_indeterminate` the same way.
+alter type public.analysis_job_error_code add value if not exists 'plan_unavailable';

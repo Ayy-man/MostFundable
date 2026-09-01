@@ -1,0 +1,3 @@
+import assert from "node:assert/strict"; import fs from "node:fs"; import path from "node:path"; import { describe, it } from "node:test";
+const source = fs.readFileSync(path.resolve(process.cwd(), "src/app/api/pull-caps/[clientId]/route.ts"), "utf8");
+describe("pull cap route", () => { it("is admin-only, flag-first, and awaits params", () => { assert.ok(source.indexOf('featureFlag("FEATURE_ANCILLARY")') < source.indexOf("request.json()")); assert.ok(source.indexOf('requireRole("platform_admin")') < source.indexOf("request.json()")); assert.match(source, /await context\.params/); assert.doesNotMatch(source, /request\.json\(\)[\s\S]*actor/); }); });

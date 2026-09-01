@@ -1,0 +1,143 @@
+{
+  "schemaVersion": 1,
+  "prompt": {
+    "key": "funding-readiness-plan",
+    "version": 1
+  },
+  "derivedSchemaVersion": 1,
+  "readinessScore": 99,
+  "readinessLabel": "Near Ready",
+  "personalChecklist": [
+    {
+      "key": "personal_information_confirmed",
+      "title": "The dispute window closes.",
+      "state": "unverified",
+      "blocking": true,
+      "todo": "TODO(#127)",
+      "children": []
+    },
+    {
+      "key": "overall_report_ready",
+      "title": "Read 609.",
+      "state": "unverified",
+      "blocking": true,
+      "todo": "TODO(#127)",
+      "children": []
+    },
+    {
+      "key": "utilization_under_30",
+      "title": "pay for delete",
+      "state": "verified",
+      "blocking": true,
+      "todo": "TODO(#127)",
+      "children": []
+    },
+    {
+      "key": "four_personal_accounts_open",
+      "title": "the removal request",
+      "state": "verified",
+      "blocking": true,
+      "todo": "TODO(#127)",
+      "children": []
+    },
+    {
+      "key": "average_age_two_years",
+      "title": "credit repair service",
+      "state": "verified",
+      "blocking": true,
+      "todo": "TODO(#127)",
+      "children": []
+    },
+    {
+      "key": "no_negative_items_reported",
+      "title": "goodwill letter",
+      "state": "verified",
+      "blocking": true,
+      "todo": "TODO(#127)",
+      "children": []
+    },
+    {
+      "key": "personal_card_ten_k_limit",
+      "title": "+40 pts",
+      "state": "verified",
+      "blocking": true,
+      "todo": "TODO(#127)",
+      "children": []
+    },
+    {
+      "key": "inquiries_within_bureau_limit",
+      "title": "raise the score by 40",
+      "state": "verified",
+      "blocking": true,
+      "todo": "TODO(#127)",
+      "children": []
+    }
+  ],
+  "businessChecklist": [
+    {
+      "key": "business_name_confirmed",
+      "title": "score up 25 pts",
+      "state": "unverified",
+      "blocking": true,
+      "todo": "TODO(#127)",
+      "children": []
+    },
+    {
+      "key": "industry_classification_confirmed",
+      "title": "approval odds shown",
+      "state": "unverified",
+      "blocking": true,
+      "todo": "TODO(#127)",
+      "children": []
+    },
+    {
+      "key": "business_entity_age_confirmed",
+      "title": "odds 82%",
+      "state": "unverified",
+      "blocking": true,
+      "todo": "TODO(#127)",
+      "children": []
+    },
+    {
+      "key": "net_asset_value_confirmed",
+      "title": "Net asset value information is confirmed",
+      "state": "unverified",
+      "blocking": true,
+      "todo": "TODO(#127)",
+      "children": []
+    },
+    {
+      "key": "business_identifier_present",
+      "title": "Business identifier is present",
+      "state": "unverified",
+      "blocking": true,
+      "todo": "TODO(#127)",
+      "children": []
+    },
+    {
+      "key": "business_email_present",
+      "title": "Business email is present",
+      "state": "unverified",
+      "blocking": true,
+      "todo": "TODO(#127)",
+      "children": []
+    },
+    {
+      "key": "business_website_present",
+      "title": "Business website is present",
+      "state": "unverified",
+      "blocking": true,
+      "todo": "TODO(#127)",
+      "children": []
+    }
+  ],
+  "estimatedCompletion": {
+    "label": "TBD",
+    "days": null
+  },
+  "generation": {
+    "driver": "mock",
+    "model": "template-v1",
+    "promptVersion": 1
+  }
+}

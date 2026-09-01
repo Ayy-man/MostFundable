@@ -1,0 +1,41 @@
+-- 052_service_role_audit_meta_grant.sql
+--
+-- The same defect migration 012 fixed for `authenticated`, on the other role.
+--
+-- 012 granted execute on `private.audit_meta_valid` to `authenticated` because
+-- `audit_log` carries
+--
+--   check constraint "audit_log_meta_valid" check (private.audit_meta_valid(meta))
+--
+-- and Postgres evaluates a check constraint as the CALLING role rather than as
+-- the table owner. It granted only that one role, because at the time the only
+-- other writer was the service role and nothing had exercised it against a live
+-- stack.
+--
+-- Something has now. With `FEATURE_REAL_AUTH` off — the Milestone-2 demo
+-- configuration, per DEC-OWN-REALAUTH-FLIP — the tracker's data adapter uses the
+-- admin client, so `POST /api/clients` inserts its `client.created` attribution
+-- row as `service_role`, and every one of those inserts died at
+--
+--   ERROR:  permission denied for function audit_meta_valid   (SQLSTATE 42501)
+--
+-- The route had already inserted the client row by then and does not roll it
+-- back, so the caller saw a 500 while a client with no attribution row stayed in
+-- the table. Measured against the live local stack on 2026-08-16 by
+-- `web/scripts/verify-tracker-live.mjs --prepare`, not inferred; the transactional
+-- verifier missed it because psql runs as `postgres`, which owns the function.
+--
+-- `service_role` already holds `grant all on table public.clients` and every
+-- other privilege this path needs (migration 004), so the execute grant is the
+-- whole gap. It leaks nothing: the function is `immutable`, takes a jsonb value
+-- the caller already holds, reads no table and returns a boolean, so calling it
+-- tells you only whether your own payload is well formed.
+--
+-- The two remaining private helpers reachable from a constraint or a trigger do
+-- not need the same treatment. `private.derived_features_valid` guards
+-- `analysis_runs.derived`, which is only ever written by
+-- `public.persist_analysis_result`, a `security definer` function that runs as
+-- its owner. Trigger functions are checked for execute at CREATE TRIGGER time,
+-- not when they fire, so the `private.validate_*` family is unaffected.
+
+grant execute on function private.audit_meta_valid(jsonb) to service_role;

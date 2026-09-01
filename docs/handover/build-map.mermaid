@@ -1,0 +1,39 @@
+%% MostFundable release bddb5ca37d2d46402cb5fc8552bba266c24b7979
+flowchart LR
+  classDef built fill:#dcfce7,stroke:#16a34a,color:#14532d
+  classDef pending fill:#fef3c7,stroke:#d97706,color:#78350f
+
+  subgraph Users
+    Consumer[Consumer workspace]:::built
+    Operator[Operator workspace]:::built
+    Affiliate[Affiliate workspace]:::built
+    Admin[Platform administration]:::built
+  end
+
+  subgraph Product
+    Auth[Authentication and role routing]:::built
+    Workflows[Enrollment, readiness, plans and tasks]:::built
+    Operations[Clients, applications, fees and support]:::built
+    Governance[Tenancy, privacy, affiliates and audit records]:::built
+  end
+
+  subgraph Launch_inputs
+    Payments[Payment-provider production proof]:::pending
+    Email[Email-delivery production proof]:::pending
+    Credit[Live credit-data operations proof]:::pending
+    Monitoring[Monitoring and recovery evidence]:::pending
+    Acceptance[Recorded acceptance]:::pending
+  end
+
+  Consumer --> Auth --> Workflows
+  Operator --> Operations
+  Affiliate --> Governance
+  Admin --> Governance
+  Workflows --> Payments
+  Operations --> Email
+  Workflows --> Credit
+  Governance --> Monitoring
+  Payments --> Acceptance
+  Email --> Acceptance
+  Credit --> Acceptance
+  Monitoring --> Acceptance
