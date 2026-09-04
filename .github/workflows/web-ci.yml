@@ -86,7 +86,9 @@ jobs:
         env:
           FEATURE_REAL_AUTH: "1"
           FEATURE_TENANCY: "1"
-        run: npm run build
+        run: |
+          eval "$(supabase status -o env)"
+          NEXT_PUBLIC_SUPABASE_URL="$API_URL" NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY" npm run build
 
       - name: End-to-end tests against the local stack
         working-directory: web
