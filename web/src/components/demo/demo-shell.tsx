@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Menu, Sparkles } from "lucide-react";
+import { Menu } from "lucide-react";
+
+import { BrandMark } from "@/components/brand-mark";
 
 import { DemoRoleTrigger } from "@/components/demo/demo-chrome";
 import { Button } from "@/components/ui/button";
@@ -72,7 +74,7 @@ function Brand({ brand, eyebrow }: Pick<DemoShellProps, "brand" | "eyebrow">) {
   return (
     <div className="flex h-[4.5rem] items-center gap-3 border-b border-sidebar-border px-5">
       <span className="grid size-8 place-items-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground shadow-sm">
-        <Sparkles aria-hidden className="size-4" />
+        <BrandMark className="size-[18px]" />
       </span>
       <div className="min-w-0">
         <p className="truncate text-[0.95rem] font-semibold tracking-[-0.01em] text-sidebar-foreground">
@@ -134,7 +136,7 @@ export function DemoShell({
       <header className="sticky top-[var(--demo-banner-height)] z-20 flex h-16 items-center justify-between border-b border-border bg-background/95 px-4 backdrop-blur lg:hidden">
         <div className="flex min-w-0 items-center gap-3">
           <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground">
-            <Sparkles aria-hidden className="size-4" />
+            <BrandMark className="size-[18px]" />
           </span>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold">{brand}</p>
