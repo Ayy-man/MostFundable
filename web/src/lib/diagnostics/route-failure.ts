@@ -29,6 +29,12 @@
 
 export const ROUTE_FAILURE_EVENT = "route_failure";
 
+/** Fields whose values are generated per occurrence and cannot carry a cause payload. */
+export const ROUTE_FAILURE_VOLATILE_FIELDS = Object.freeze([
+  "at",
+  "correlationId",
+] as const);
+
 /**
  * What kind of thing was thrown. This is the classification the triage asked for: enough to tell a
  * driver rejection from a Postgres refusal from a bare string, and nothing that could be a value.

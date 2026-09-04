@@ -46,6 +46,24 @@ jobs:
       - name: Hardening tests
         run: npm run test:hardening
 
+      - name: Knowledge-base boundary gates
+        run: npm run test:kb-boundaries
+
+      - name: No-report-persistence gate
+        run: node scripts/verify-no-report-persistence.mjs
+
+      - name: Environment contract gate
+        run: node scripts/verify-env-contract.mjs
+
+      - name: Source contract gates
+        run: node scripts/verify-source-gates.mjs
+
+      - name: Fee legal gate
+        run: node scripts/verify-fee-legal-gate.mjs
+
+      - name: Repository and build secret hygiene
+        run: node scripts/verify-secret-hygiene.mjs --repo .. --build-dir .next
+
       - name: Compliance copy scanner
         run: node scripts/verify-compliance-copy.mjs --self-test && node scripts/verify-compliance-copy.mjs
 

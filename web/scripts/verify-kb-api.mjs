@@ -15,12 +15,10 @@ const ADMIN_ID = "00000000-0000-0000-0000-000000000001";
 const OPERATOR_A_ID = "a1000000-0000-0000-0000-000000000001";
 const OPERATOR_B_ID = "b1000000-0000-0000-0000-000000000001";
 const CONSUMER_ID = "a1000000-0000-0000-0000-000000000011";
-const CLIENT_WITH_TEAM_CHAT = "a3000000-0000-0000-0000-000000000003";
-// The team chat thread is looked up rather than fabricated. `support_threads_one_team_chat_per_client`
-// (migration 100) permits exactly one team_chat row per client, and the seed now carries one for
-// this client, so inserting a second is not merely redundant — it is impossible, and it is
-// impossible in production too. Deriving the id from the seed also means a reseed that renumbers
-// the thread cannot turn this arm into a check of nothing.
+// The team chat thread is looked up rather than fabricated. Migration 100
+// permits one active draft per thread, so the query derives an operator-visible
+// seeded thread that is eligible for draft creation instead of assuming a
+// particular client has remained draft-free.
 let threadId = null;
 const WINDOW = "2098-W51";
 let assertions = 0;
@@ -110,8 +108,8 @@ try {
   check(answerA.payload.answer.endsWith("Answers come from your workspace data. Not credit, legal, or tax advice."), "operator footer is exact");
   check(JSON.stringify(answerA.payload.citations) !== JSON.stringify(answerB.payload.citations), "operator sessions receive distinct visible citations");
 
-  threadId = runSql(`select id from public.support_threads where kind = 'team_chat' and client_id = '${CLIENT_WITH_TEAM_CHAT}' limit 1;`);
-  check(threadId, "the seed carries no team chat thread for the scoped client; this arm has nothing to draft against");
+  threadId = runSql(`select thread.id from public.support_threads as thread where thread.kind = 'team_chat' and thread.org_id = (select profile.org_id from public.profiles as profile where profile.id = '${OPERATOR_A_ID}') and not exists (select 1 from public.held_drafts as draft where draft.thread_id = thread.id) order by thread.id limit 1;`);
+  check(threadId, "the seed carries no draft-free team chat thread for the scoped operator; this arm has nothing to draft against");
   const before = await call(on, "GET", `/api/support/threads/${threadId}`, OPERATOR_A_ID);
   equal(before.status, 200, "scoped support thread is visible");
   const draft = await call(on, "POST", "/api/kb/operator", OPERATOR_A_ID, { mode: "message_draft", supportThreadId: threadId });

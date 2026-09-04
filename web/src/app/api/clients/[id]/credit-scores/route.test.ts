@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { setRouteFailureSink } from '@/lib/diagnostics/route-failure';
+import { ROUTE_FAILURE_VOLATILE_FIELDS, setRouteFailureSink } from '@/lib/diagnostics/route-failure';
 
 import { handleGetCreditScores } from './route.ts';
 
@@ -89,8 +89,8 @@ describe('operator credit-score route', () => {
     }
     assert.equal(failures.length, malformed.length);
     const stableFailureFields = failures.map((value) => {
-      const { at: _at, correlationId: _correlationId, ...record } = value as Record<string, unknown>;
-      return record;
+      return Object.fromEntries(Object.entries(value as Record<string, unknown>)
+        .filter(([key]) => !ROUTE_FAILURE_VOLATILE_FIELDS.includes(key as typeof ROUTE_FAILURE_VOLATILE_FIELDS[number])));
     });
     assert.doesNotMatch(JSON.stringify(stableFailureFields), /825|provider_timeout|must not pass through/);
   });
