@@ -1,10 +1,10 @@
 # MostFundable
 
-MostFundable is a multi-tenant funding-readiness application for consumers, operator teams, affiliates, and platform administrators. This handover repository is a clean export of release `bddb5ca37d2d46402cb5fc8552bba266c24b7979`; it contains the application, database migrations, tests, runtime configuration templates, and the current operating documents.
+MostFundable is a multi-tenant funding-readiness application for consumers, operator teams, affiliates, and platform administrators. This repository contains the application, database migrations, tests, runtime configuration templates, and current operating documents. Identify a source review with `git rev-parse HEAD`; the production alias was last verified at commit `9d290a3fb01ac5f656179f7946d2f4df9ece1161` on 2026-09-04, so a newer branch or preview is candidate evidence rather than production evidence.
 
 ## What is built
 
-The application includes authentication and role routing, tenant-scoped workspaces, consumer enrollment and consent records, readiness and funding workflows, operator client management, tasks, applications, fee agreements, privacy requests, affiliate access, and platform administration. The included migration set reaches version 433 and contains the corresponding database tests.
+The application includes authentication and role routing, tenant-scoped workspaces, consumer enrollment and consent records, readiness and funding workflows, operator client management, tasks, applications, fee agreements, privacy-request intake, affiliate access, and platform administration. The included migration set reaches version 433 and contains the corresponding database tests.
 
 ## Run locally
 
@@ -27,6 +27,10 @@ npm run typecheck
 npm run build
 npm test
 npm run test:hardening
+npm run test:e2e
+npm run test:gates
+cd ..
+supabase test db
 ```
 
 ## Before launch

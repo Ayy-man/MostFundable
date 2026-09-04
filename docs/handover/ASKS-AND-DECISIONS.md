@@ -1,6 +1,6 @@
 # Asks and decisions
 
-Release: `bddb5ca37d2d46402cb5fc8552bba266c24b7979`
+Production evidence checked 2026-09-04: `9d290a3fb01ac5f656179f7946d2f4df9ece1161`. Record the exact promoted commit for every later review.
 
 | Needed input | Responsible party | Why it is needed | Current state |
 | --- | --- | --- | --- |
@@ -15,7 +15,7 @@ Release: `bddb5ca37d2d46402cb5fc8552bba266c24b7979`
 
 | Walkthrough | Release | Status | Acceptance record |
 | --- | --- | --- | --- |
-| Administration workflow | `bddb5ca37d2d46402cb5fc8552bba266c24b7979` | Open | To be recorded |
-| Operations workflow | `bddb5ca37d2d46402cb5fc8552bba266c24b7979` | Open | To be recorded |
+| Administration workflow | Exact promoted commit required | Open | To be recorded |
+| Operations workflow | Exact promoted commit required | Open | To be recorded |
 
 Record decisions as concise facts: the decision, responsible party, date, and resulting action. Do not include private access material, personal data, or internal working notes.

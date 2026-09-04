@@ -1,6 +1,6 @@
 # MostFundable operations runbook
 
-Release: `bddb5ca37d2d46402cb5fc8552bba266c24b7979`
+Production evidence checked 2026-09-04: `9d290a3fb01ac5f656179f7946d2f4df9ece1161`. Use the exact candidate commit for every release procedure.
 
 ## Release procedure
 

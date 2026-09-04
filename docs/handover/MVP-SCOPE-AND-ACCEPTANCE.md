@@ -1,6 +1,6 @@
 # MVP scope and acceptance
 
-Release: `bddb5ca37d2d46402cb5fc8552bba266c24b7979`
+Production evidence checked 2026-09-04: `9d290a3fb01ac5f656179f7946d2f4df9ece1161`. Review newer source by its exact commit.
 
 ## Included product scope
 
@@ -12,7 +12,7 @@ Release: `bddb5ca37d2d46402cb5fc8552bba266c24b7979`
 | Readiness, plans, and tracking | Included | Live data-operation evidence where applicable |
 | Operator workflows | Included | Creation and lifecycle evidence for changed workflows |
 | Applications and fee agreements | Included | Production workflow evidence |
-| Support, privacy, and notifications | Included | Delivery and complete-request evidence |
+| Support messaging, privacy-request intake, and notifications | Included | Delivery and end-to-end erasure evidence |
 | Administration and affiliates | Included | Role and lifecycle evidence |
 
 ## Acceptance approach
@@ -21,7 +21,7 @@ For each item being accepted, retain the release identifier, date, responsible p
 
 ## Current boundaries
 
-The repository does not claim that payment processing, product email delivery, live credit-data operations, monitoring, or recorded acceptance are complete. Features outside the agreed MVP scope should be assessed separately before work begins.
+The repository does not claim that payment processing, product email delivery, live credit-data operations, monitoring, end-to-end privacy erasure, or recorded acceptance are complete. Features outside the agreed MVP scope should be assessed separately before work begins.
 
 ## Inputs still required
 

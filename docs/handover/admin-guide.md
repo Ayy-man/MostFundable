@@ -1,6 +1,6 @@
 # MostFundable admin guide
 
-Release: `bddb5ca37d2d46402cb5fc8552bba266c24b7979`
+Production evidence checked 2026-09-04: `9d290a3fb01ac5f656179f7946d2f4df9ece1161`. Use the exact promoted commit during an operational review.
 
 ## Roles and boundaries
 
@@ -8,7 +8,7 @@ Platform administrators work across operator organizations. Operators work only 
 
 ## Administration
 
-Platform administrators can manage operator organizations, reference data, training content, support requests, privacy requests, approved settings, and audit records. Operators can manage clients, tasks, applications, outcomes, fee agreements, team membership, affiliates, and workspace settings.
+Platform administrators can manage operator organizations, reference data, training content, support requests, privacy requests, approved settings, and review audit records. Operators can manage clients, tasks, applications, outcomes, fee agreements, team membership, affiliates, and workspace settings.
 
 ## Safe operating practice
 
