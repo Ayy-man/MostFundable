@@ -31,10 +31,12 @@ export async function postEnrollment(
   actorId: string,
   body: unknown,
 ): Promise<EnrollmentView> {
-  const response = await fetch(`${enrollmentBaseUrl}${path}`, {
+  const target = new URL(path, enrollmentBaseUrl);
+  const response = await fetch(target, {
     body: JSON.stringify(body),
     headers: {
       "content-type": "application/json",
+      origin: target.origin,
       "x-mf-demo-profile-id": actorId,
     },
     method: "POST",

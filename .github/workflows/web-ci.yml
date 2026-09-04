@@ -102,24 +102,8 @@ jobs:
       - name: Build application for local end-to-end tests
         working-directory: web
         env:
-          FEATURE_ADMIN: "1"
-          FEATURE_AFFILIATES: "1"
-          FEATURE_ANALYSIS: "1"
-          FEATURE_APPLICATIONS: "1"
-          FEATURE_BILLING: "1"
-          FEATURE_BILLING_OPS: "1"
-          FEATURE_CONSOLE_OPS: "1"
-          FEATURE_EMAIL: "1"
-          FEATURE_ENROLLMENT: "1"
-          FEATURE_FEES: "1"
-          FEATURE_KB: "1"
-          FEATURE_PAID_REFRESH: "1"
-          FEATURE_REFERRALS: "1"
-          FEATURE_REVENUE: "1"
-          FEATURE_SUPPORT: "1"
+          FEATURE_REAL_AUTH: "1"
           FEATURE_TENANCY: "1"
-          FEATURE_TIMELINE: "1"
-          FEATURE_TRACKER: "1"
         run: |
           eval "$(supabase status -o env)"
           NEXT_PUBLIC_SUPABASE_URL="$API_URL" NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY" npm run build
@@ -144,7 +128,6 @@ jobs:
           FEATURE_REFERRALS: "1"
           FEATURE_REVENUE: "1"
           FEATURE_SUPPORT: "1"
-          FEATURE_TENANCY: "1"
           FEATURE_TIMELINE: "1"
           FEATURE_TRACKER: "1"
           MF_BILLING_E2E_LOG: ${{ runner.temp }}/mostfundable-e2e.log

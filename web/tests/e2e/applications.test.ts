@@ -165,10 +165,12 @@ async function call<T>(
   actorId: string,
   body?: unknown,
 ): Promise<ApiResult<T>> {
-  const response = await fetch(`${enrollmentBaseUrl}${path}`, {
+  const target = new URL(path, enrollmentBaseUrl);
+  const response = await fetch(target, {
     method,
     headers: {
       "content-type": "application/json",
+      ...(!["GET", "HEAD"].includes(method) ? { origin: target.origin } : {}),
       "x-mf-demo-profile-id": actorId,
     },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),

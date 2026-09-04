@@ -9,21 +9,23 @@ import {
 } from "../../src/lib/referrals/fixture.ts";
 
 const baseUrl = process.env.REFERRAL_E2E_BASE_URL;
+const requestOrigin = baseUrl ? new URL(baseUrl).origin : "";
 
 test("referral create, click, and exact-client conversion persist one lifecycle", { skip: !baseUrl }, async () => {
   provisionReferralFixture();
-  const sourceHeaders = { "x-mf-demo-profile-id": REFERRAL_FIXTURE.sourceConsumerId };
+  const sourceHeaders = { origin: requestOrigin, "x-mf-demo-profile-id": REFERRAL_FIXTURE.sourceConsumerId };
   const destinationHeaders = {
     "content-type": "application/json",
+    origin: requestOrigin,
     "x-mf-demo-profile-id": REFERRAL_FIXTURE.destinationConsumerId,
   };
 
   try {
-    const unauthenticated = await fetch(`${baseUrl}/api/referrals`, { method: "POST" });
+    const unauthenticated = await fetch(`${baseUrl}/api/referrals`, { method: "POST", headers: { origin: requestOrigin } });
     assert.equal(unauthenticated.status, 401);
     const operator = await fetch(`${baseUrl}/api/referrals`, {
       method: "POST",
-      headers: { "x-mf-demo-profile-id": "a1000000-0000-0000-0000-000000000001" },
+      headers: { origin: requestOrigin, "x-mf-demo-profile-id": "a1000000-0000-0000-0000-000000000001" },
     });
     assert.equal(operator.status, 403);
 
