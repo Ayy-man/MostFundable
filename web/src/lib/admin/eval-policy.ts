@@ -4,7 +4,11 @@ import { cleanFeatures, derogFeatures } from "@/lib/llm/__fixtures__/features";
 import { OPENROUTER_MODEL } from "@/lib/llm/openrouter-driver";
 import { MOCK_PLAN_MODEL } from "@/lib/llm/mock-driver";
 import { MOCK_SUPPORT_DRAFT_MODEL } from "@/lib/support/mock-driver";
-import { resolveDriver, type EnvSource } from "@/lib/env";
+import {
+  resolveDriverFromSpecWithDeprecatedSelector,
+  type DriverSpec,
+  type EnvSource,
+} from "@/lib/env";
 
 import type { DerivedFeatures } from "@/lib/analysis/features";
 import type { SupportDraftContext } from "@/lib/support/types";
@@ -40,8 +44,35 @@ export const EVAL_REFERENCE_DATASET_HASHES = Object.freeze({
   "support-draft": evaluationDatasetHash(SUPPORT_REFERENCE_DATASET),
 });
 
+/**
+ * The eval policy's own driver table.
+ *
+ * The identity a recorded eval run carries — which driver and which model
+ * produced it — used to come from `AI_DRIVER`, shared with the assistants and
+ * the support draft engine. That made a prompt activation's eligibility a side
+ * effect of a deployment decision about something else: flipping the assistants
+ * onto a provider turned `launch_driver_unavailable` into a live evaluation run,
+ * and flipping them back made every recorded run's identity a claim about a
+ * driver the platform no longer ran. `EVAL_DRIVER` decides whether evaluation
+ * runs count, and decides nothing else.
+ *
+ * `AI_DRIVER` is read as a fallback while this key is blank, for one release.
+ */
+export const EVAL_DRIVERS = {
+  selector: "EVAL_DRIVER",
+  values: ["mock", "openrouter"],
+  fallback: "mock",
+  requires: { openrouter: ["OPENROUTER_API_KEY"] },
+} as const satisfies DriverSpec;
+
+export type EvalDriverName = (typeof EVAL_DRIVERS)["values"][number];
+
+export function resolveEvalDriver(env: EnvSource = process.env): EvalDriverName {
+  return resolveDriverFromSpecWithDeprecatedSelector("eval", EVAL_DRIVERS, "AI_DRIVER", env);
+}
+
 export function promptEvaluationIdentity(key: PromptKey, env: EnvSource = process.env) {
-  const driver = resolveDriver("ai", env);
+  const driver = resolveEvalDriver(env);
   const model = driver === "openrouter"
     ? OPENROUTER_MODEL
     : key === "funding-readiness-plan"
