@@ -52,9 +52,6 @@ jobs:
       - name: Compliance copy scanner
         run: node scripts/verify-compliance-copy.mjs --self-test && node scripts/verify-compliance-copy.mjs
 
-      - name: Source and product gates
-        run: npm run test:gates
-
   db-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -75,6 +72,21 @@ jobs:
 
       - name: Run pgTAP
         run: supabase test db
+
+      - name: Set up Node.js for source and product gates
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22.18.0
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install application dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Source and product gates
+        working-directory: web
+        run: npm run test:gates
 
       - name: Stop local stack
         if: always()
