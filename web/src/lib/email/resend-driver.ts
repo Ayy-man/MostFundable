@@ -135,7 +135,11 @@ export function createResendEmailDriver(options: ResendEmailDriverOptions): Emai
       const variables = validateTemplateVariables("operator_card_failure", input.vars);
       const providerVariables = buildProviderVariables("operator_card_failure", variables);
       const recipient = mailbox(input.to);
-      const senderName = displayName(await options.resolveOrgDisplayName(input.orgId));
+      const sender = await options.resolveOrgDisplayName(input.orgId).then(
+        (value) => ({ ok: true as const, value: displayName(value) }),
+        (error: unknown) => ({ ok: false as const, error }),
+      );
+      if (!sender.ok && sender.error instanceof ResendEmailError) throw sender.error;
       const claimed = await options.repository.claim({
         deliveryId: variables.DELIVERY_REFERENCE,
         template: "operator_card_failure",
@@ -149,6 +153,8 @@ export function createResendEmailDriver(options: ResendEmailDriverOptions): Emai
           attemptCount: claimed.attemptCount,
         });
       }
+      if (!sender.ok) throw sender.error;
+      const senderName = sender.value;
 
       const controller = new AbortController();
       const timer = schedule(() => controller.abort(), TIMEOUT_MS);

@@ -188,9 +188,32 @@ describe("Resend email driver", () => {
 });
 
 describe("email real arm", () => {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const fromAddress = process.env.EMAIL_FROM_ADDRESS?.trim();
+  const missing = [
+    apiKey ? null : "RESEND_API_KEY",
+    fromAddress ? null : "EMAIL_FROM_ADDRESS",
+  ].filter((key): key is string => key !== null);
+
   it(
     "requires a provider receipt before account acceptance",
-    { skip: "SKIPPED-MISSING-KEY: account execution belongs to the key-arrival arm" },
-    () => {},
+    {
+      skip:
+        missing.length === 0
+          ? false
+          : "SKIPPED-MISSING-KEY: " + missing.join(" and ") + " required for the Resend account arm",
+    },
+    async () => {
+      const events: unknown[] = [];
+      const result = await createResendEmailDriver({
+        apiKey,
+        fromAddress,
+        repository: repository(events),
+        resolveOrgDisplayName: async () => "MostFundable contract",
+      }).send({ ...request(), to: fromAddress! });
+      assert.equal(result.status, "accepted");
+      assert.equal((events.at(-1) as unknown[])[0], "accept");
+      assert.ok(result.providerRef.length > 0);
+    },
   );
 });
