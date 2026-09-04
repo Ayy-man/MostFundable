@@ -100,4 +100,55 @@ describe("enrollment mutation feature boundary", () => {
       else process.env.FEATURE_ENROLLMENT = previous;
     }
   });
+
+  test("the IDV activation response schedules one post-response analysis drain and ignores its failure", async () => {
+    const previous = process.env.FEATURE_ENROLLMENT;
+    process.env.FEATURE_ENROLLMENT = "1";
+    const scheduled: Array<() => void | Promise<void>> = [];
+    let drains = 0;
+    try {
+      const response = await submitIdv(
+        new Request(`http://local.test/api/enrollments/${ID}/idv`, { body: "{}", method: "POST" }),
+        ITEM_CONTEXT,
+        {
+          async getSession() {
+            return { disabledAt: null, id: ID, manages: [], orgId: ID, orgMembership: null, orgRole: null, role: "consumer" };
+          },
+          parseEnrollmentId(value) {
+            if (typeof value !== "string") throw new Error("invalid enrollment id");
+            return value;
+          },
+          parseIdvSubmitBody() { return { kind: "smfa_status" } as never; },
+          async readEnrollmentJson() { return {}; },
+          async reconcile() {
+            return {
+              attemptsRemaining: 2, consents: [], enrollmentId: ID, idvState: "passed",
+              lockedUntil: null, milestones: [], needsOperatorAttention: null,
+              parkedUntil: null, status: "enrolled", subscription: null,
+            };
+          },
+          async submitIdv() {
+            return {
+              attemptsRemaining: 2, consents: [], enrollmentId: ID, idvState: "passed",
+              lockedUntil: null, milestones: [], needsOperatorAttention: null,
+              parkedUntil: null, status: "active", subscription: null,
+            };
+          },
+          after(callback) { scheduled.push(callback); },
+          async drainActivatedAnalysis() {
+            drains += 1;
+            throw new Error("the cron remains the safety net");
+          },
+        },
+      );
+      assert.equal(response.status, 200);
+      assert.equal((await response.json()).status, "active");
+      assert.equal(scheduled.length, 1, "activation schedules work after the response");
+      await scheduled[0]();
+      assert.equal(drains, 1);
+    } finally {
+      if (previous === undefined) delete process.env.FEATURE_ENROLLMENT;
+      else process.env.FEATURE_ENROLLMENT = previous;
+    }
+  });
 });

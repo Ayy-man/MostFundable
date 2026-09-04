@@ -1,3 +1,5 @@
+import { after } from "next/server";
+
 import { AppError, toHttpResponse } from "@/lib/enrollment/errors";
 import { featureFlag } from "@/lib/env";
 
@@ -10,7 +12,36 @@ type IdvRouteDependencies = {
   readEnrollmentJson: typeof import("@/lib/enrollment/http")["readEnrollmentJson"];
   reconcile: typeof import("@/lib/enrollment/service")["reconcile"];
   submitIdv: typeof import("@/lib/enrollment/service")["submitIdv"];
+  /** Test seam for Next's post-response callback. */
+  after?: (callback: () => void | Promise<void>) => void;
+  /** Test seam for the bounded post-activation analysis drain. */
+  drainActivatedAnalysis?: () => Promise<void>;
 };
+
+function scheduleActivatedAnalysis(
+  schedule: (callback: () => void | Promise<void>) => void,
+  drain: () => Promise<void>,
+): void {
+  try {
+    schedule(async () => {
+      try {
+        await drain();
+      } catch {
+        // Durable work remains queued for the scheduled analysis drain.
+      }
+    });
+  } catch {
+    // Scheduling is opportunistic; activation has already committed.
+  }
+}
+
+async function drainOneActivatedAnalysis(): Promise<void> {
+  const worker = await import("@/lib/analysis/worker");
+  await worker.drainAnalysisQueue({
+    maxJobs: 1,
+    workerId: worker.getAnalysisWorkerId(),
+  });
+}
 
 export async function POST(
   request: Request,
@@ -40,7 +71,14 @@ export async function POST(
       return Response.json(reconciled);
     }
     const body = loaded.parseIdvSubmitBody(await loaded.readEnrollmentJson(request));
-    return Response.json(await loaded.submitIdv(id, body, actor));
+    const view = await loaded.submitIdv(id, body, actor);
+    if (view.status === "active") {
+      scheduleActivatedAnalysis(
+        loaded.after ?? after,
+        loaded.drainActivatedAnalysis ?? drainOneActivatedAnalysis,
+      );
+    }
+    return Response.json(view);
   } catch (error) {
     return toHttpResponse(error);
   }
