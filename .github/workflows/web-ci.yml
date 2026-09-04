@@ -102,8 +102,24 @@ jobs:
       - name: Build application for local end-to-end tests
         working-directory: web
         env:
-          FEATURE_REAL_AUTH: "1"
+          FEATURE_ADMIN: "1"
+          FEATURE_AFFILIATES: "1"
+          FEATURE_ANALYSIS: "1"
+          FEATURE_APPLICATIONS: "1"
+          FEATURE_BILLING: "1"
+          FEATURE_BILLING_OPS: "1"
+          FEATURE_CONSOLE_OPS: "1"
+          FEATURE_EMAIL: "1"
+          FEATURE_ENROLLMENT: "1"
+          FEATURE_FEES: "1"
+          FEATURE_KB: "1"
+          FEATURE_PAID_REFRESH: "1"
+          FEATURE_REFERRALS: "1"
+          FEATURE_REVENUE: "1"
+          FEATURE_SUPPORT: "1"
           FEATURE_TENANCY: "1"
+          FEATURE_TIMELINE: "1"
+          FEATURE_TRACKER: "1"
         run: |
           eval "$(supabase status -o env)"
           NEXT_PUBLIC_SUPABASE_URL="$API_URL" NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY" npm run build
@@ -112,16 +128,113 @@ jobs:
         working-directory: web
         env:
           ADMIN_E2E: "1"
+          ENROLL_E2E: "1"
+          FEATURE_ADMIN: "1"
+          FEATURE_AFFILIATES: "1"
+          FEATURE_ANALYSIS: "1"
+          FEATURE_APPLICATIONS: "1"
+          FEATURE_BILLING: "1"
+          FEATURE_BILLING_OPS: "1"
+          FEATURE_CONSOLE_OPS: "1"
+          FEATURE_EMAIL: "1"
+          FEATURE_ENROLLMENT: "1"
+          FEATURE_FEES: "1"
+          FEATURE_KB: "1"
+          FEATURE_PAID_REFRESH: "1"
+          FEATURE_REFERRALS: "1"
+          FEATURE_REVENUE: "1"
+          FEATURE_SUPPORT: "1"
+          FEATURE_TENANCY: "1"
+          FEATURE_TIMELINE: "1"
+          FEATURE_TRACKER: "1"
           MF_BILLING_E2E_LOG: ${{ runner.temp }}/mostfundable-e2e.log
           MF_TENANCY_MAIL_E2E: "1"
+          PAID_REFRESH_E2E: "1"
+          PAID_REFRESH_E2E_BASE_URL: http://localhost:3003
+          REFERRAL_E2E: "1"
+          REFERRAL_E2E_BASE_URL: http://localhost:3003
+          REFERRAL_INTAKE_ORIGIN: http://localhost:3003
+          REFERRAL_PLATFORM_ORG_ID: f0000000-0000-0000-0000-000000000001
           REVENUE_E2E: "1"
+          ENROLL_TEST_BASE_URL: http://localhost:3003
         run: |
+          eval "$(supabase status -o env)"
+          export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
+          export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
+          export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          export STRIPE_WEBHOOK_SECRET="local-e2e-$(openssl rand -hex 24)"
+          npm start -- -H 127.0.0.1 -p 3003 > "$RUNNER_TEMP/mostfundable-demo-server.log" 2>&1 &
+          server_pid=$!
+          cleanup() {
+            kill "$server_pid" 2>/dev/null || true
+            wait "$server_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          node - <<'NODE'
+          const target = "http://localhost:3003/api/enroll";
+          for (let attempt = 0; attempt < 120; attempt += 1) {
+            try {
+              const response = await fetch(target);
+              if (response.status < 500) process.exit(0);
+            } catch {}
+            await new Promise((resolve) => setTimeout(resolve, 250));
+          }
+          throw new Error(`local E2E server did not become ready at ${target}`);
+          NODE
           status=0
           npm run test:e2e || status=$?
-          if [ "$status" -ne 0 ] && [ -f "$MF_BILLING_E2E_LOG" ]; then
-            tail -250 "$MF_BILLING_E2E_LOG"
+          if [ "$status" -ne 0 ]; then
+            tail -250 "$RUNNER_TEMP/mostfundable-demo-server.log" || true
+            if [ -f "$MF_BILLING_E2E_LOG" ]; then
+              tail -250 "$MF_BILLING_E2E_LOG"
+            fi
           fi
           exit "$status"
+
+      - name: Authenticated affiliate and fee end-to-end tests
+        working-directory: web
+        run: |
+          supabase db reset --local
+          eval "$(supabase status -o env)"
+          export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
+          export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
+          export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          export FEATURE_AFFILIATES="1"
+          export FEATURE_ENROLLMENT="1"
+          export FEATURE_FEES="1"
+          export FEATURE_REAL_AUTH="1"
+          export AFFILIATES_E2E_BASE_URL="http://localhost:3005"
+          export FEES_TEST_BASE_URL="http://localhost:3005"
+          local_seed_password="$(node - <<'NODE'
+          const source = require("node:fs").readFileSync("../supabase/seed.sql", "utf8");
+          const password = source.match(/extensions\.crypt\('([^']+)'/)?.[1];
+          if (!password) throw new Error("local seed password fixture is missing");
+          process.stdout.write(password);
+          NODE
+          )"
+          export AUTH_DEV_OPERATOR_PASSWORD="$local_seed_password"
+          export AUTH_DEV_AFFILIATE_PASSWORD="$local_seed_password"
+          export FEES_E2E_OWNER_PASSWORD="$local_seed_password"
+          export FEES_E2E_ADMIN_PASSWORD="$local_seed_password"
+          npm start -- -H 127.0.0.1 -p 3005 > "$RUNNER_TEMP/mostfundable-auth-server.log" 2>&1 &
+          server_pid=$!
+          cleanup() {
+            kill "$server_pid" 2>/dev/null || true
+            wait "$server_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          node - <<'NODE'
+          const target = "http://localhost:3005/api/auth/sign-in";
+          for (let attempt = 0; attempt < 120; attempt += 1) {
+            try {
+              const response = await fetch(target, { method: "POST" });
+              if (response.status < 500) process.exit(0);
+            } catch {}
+            await new Promise((resolve) => setTimeout(resolve, 250));
+          }
+          throw new Error(`local authenticated E2E server did not become ready at ${target}`);
+          NODE
+          node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/ts-resolve-hook.mjs --test --test-concurrency=1 --test-reporter=tap tests/e2e/affiliates.test.ts tests/e2e/fees-legal-gate.test.ts
 
       - name: Source and product gates
         working-directory: web
