@@ -56,14 +56,15 @@ async function start(flagOn) {
   if (flagOn) { env.FEATURE_KB = "1"; env.FEATURE_SUPPORT = "1"; }
   const child = spawn(path.join(WEB_ROOT, "node_modules/.bin/next"), ["start", "-p", String(port)], { cwd: WEB_ROOT, detached: true, env, stdio: "ignore" });
   children.push(child);
-  const base = `http://127.0.0.1:${port}`;
+  const base = `http://localhost:${port}`;
   const deadline = Date.now() + 120_000;
   while (Date.now() < deadline) { if (await fetch(`${base}/api/enroll`).then((response) => response.status > 0, () => false)) return base; await delay(300); }
   throw new Error("built server did not become ready");
 }
 function stopChildren() { for (const child of children.splice(0)) { try { process.kill(-child.pid, "SIGTERM"); } catch { try { child.kill("SIGTERM"); } catch {} } } }
 async function call(base, method, route, profileId, body) {
-  const response = await fetch(`${base}${route}`, { method, headers: { ...(profileId ? { "x-mf-demo-profile-id": profileId } : {}), ...(body === undefined ? {} : { "content-type": "application/json" }) }, body: body === undefined ? undefined : JSON.stringify(body) });
+  const target = new URL(route, base);
+  const response = await fetch(target, { method, headers: { ...(profileId ? { "x-mf-demo-profile-id": profileId } : {}), ...(body === undefined ? {} : { "content-type": "application/json" }), ...(!["GET", "HEAD"].includes(method) ? { origin: new URL(base).origin } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) });
   const text = await response.text();
   let payload = null; try { payload = JSON.parse(text); } catch {}
   return { status: response.status, payload };

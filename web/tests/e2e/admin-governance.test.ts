@@ -48,12 +48,15 @@ const skip = process.env.ADMIN_E2E !== "1"
     : schemaProblem ?? buildProblem() ?? false;
 
 async function api(baseUrl: string, path: string, input: { body?: unknown; method?: "GET" | "PATCH" | "POST"; actor?: string } = {}) {
-  const response = await fetch(`${baseUrl}${path}`, {
-    method: input.method ?? "GET",
+  const method = input.method ?? "GET";
+  const target = new URL(path, baseUrl);
+  const response = await fetch(target, {
+    method,
     body: input.body === undefined ? undefined : JSON.stringify(input.body),
     headers: {
       ...(input.actor ? { "x-mf-demo-profile-id": input.actor } : {}),
       ...(input.body === undefined ? {} : { "content-type": "application/json" }),
+      ...(!["GET", "HEAD"].includes(method) ? { origin: new URL(baseUrl).origin } : {}),
     },
   });
   const text = await response.text();

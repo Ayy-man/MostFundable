@@ -307,7 +307,10 @@ export async function startChildServer(input: {
   );
   child.unref();
 
-  const baseUrl = `http://127.0.0.1:${input.port}`;
+  // Next 16.3 canonicalizes `next start` request URLs to localhost. Use that
+  // runtime origin here so test requests exercise the same-origin guard rather
+  // than being rejected before they reach the route under test.
+  const baseUrl = `http://localhost:${input.port}`;
   const deadline = Date.now() + SERVER_READY_TIMEOUT_MS;
   while (Date.now() < deadline) {
     // Any HTTP answer means the server is listening. Insisting on a 200 would

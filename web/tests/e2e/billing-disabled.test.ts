@@ -113,9 +113,12 @@ describe("billing is inert with FEATURE_BILLING absent", { skip }, () => {
     method: "GET" | "POST",
     route: string,
   ): Promise<{ cacheControl: string | null; payload: unknown; status: number }> {
-    const response = await fetch(`${baseUrl}${route}`, {
+    const target = new URL(route, baseUrl);
+    const response = await fetch(target, {
       body: method === "POST" ? JSON.stringify({}) : undefined,
-      headers: method === "POST" ? { "content-type": "application/json" } : {},
+      headers: method === "POST"
+        ? { "content-type": "application/json", origin: new URL(baseUrl).origin }
+        : {},
       method,
     });
     const raw = await response.text();

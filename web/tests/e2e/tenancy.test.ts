@@ -188,7 +188,7 @@ describe("Phase 20 tenancy over live local HTTP", { skip }, () => {
       body: JSON.stringify({ email, password }),
       headers: {
         "content-type": "application/json",
-        origin: signInUrl.origin,
+        origin: new URL(baseUrl).origin,
         "x-forwarded-host": host,
       },
       method: "POST",
@@ -219,7 +219,7 @@ describe("Phase 20 tenancy over live local HTTP", { skip }, () => {
       headers: {
         ...(input.cookie ? { cookie: input.cookie } : {}),
         ...(input.method && !["GET", "HEAD"].includes(input.method)
-          ? { origin: target.origin }
+          ? { origin: new URL(input.baseUrl ?? defaultBase).origin }
           : {}),
         "x-forwarded-host": input.host,
         ...input.headers,
