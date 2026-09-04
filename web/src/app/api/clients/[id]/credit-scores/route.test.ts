@@ -64,16 +64,16 @@ describe('operator credit-score route', () => {
 
   it('turns malformed provider results into a private 503 instead of a malformed 200', async () => {
     const failures: unknown[] = [];
+    const malformed = [
+      null,
+      { available: true, scores: null },
+      { available: true, scores: [] },
+      { available: true, scores: [{ bureau: 'EFX', model: 'VANTAGE', observedAt: null, score: 825 }] },
+      { available: true, scores: [{ bureau: 'EQF', model: 'VANTAGE', observedAt: null, score: 825.5 }] },
+      { available: false, reason: 'provider_timeout' },
+    ];
     const restore = setRouteFailureSink((record) => failures.push(record));
     try {
-      const malformed = [
-        null,
-        { available: true, scores: null },
-        { available: true, scores: [] },
-        { available: true, scores: [{ bureau: 'EFX', model: 'VANTAGE', observedAt: null, score: 825 }] },
-        { available: true, scores: [{ bureau: 'EQF', model: 'VANTAGE', observedAt: null, score: 825.5 }] },
-        { available: false, reason: 'provider_timeout' },
-      ];
       for (const value of malformed) {
         const response = await handleGetCreditScores(context(), dependencies({
           async readScores() { return value; },
@@ -87,7 +87,11 @@ describe('operator credit-score route', () => {
     } finally {
       restore();
     }
-    assert.equal(failures.length, 6);
-    assert.doesNotMatch(JSON.stringify(failures), /825|provider_timeout|must not pass through/);
+    assert.equal(failures.length, malformed.length);
+    const stableFailureFields = failures.map((value) => {
+      const { at: _at, correlationId: _correlationId, ...record } = value as Record<string, unknown>;
+      return record;
+    });
+    assert.doesNotMatch(JSON.stringify(stableFailureFields), /825|provider_timeout|must not pass through/);
   });
 });

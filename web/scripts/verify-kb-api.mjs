@@ -7,6 +7,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { KB_NDJSON_CONTENT_TYPE, readKbStreamLines } from "../src/lib/kb/stream.ts";
 import { KB_EMBEDDING_DRIVERS } from "../src/lib/kb/retrieval.ts";
 import { CONSUMER_KB_IDENTITY } from "../src/lib/kb/consumer.ts";
+import { CONSUMER_ASSISTANT_FAILURE_COPY } from "../src/lib/kb/handlers.ts";
 
 const WEB_ROOT = path.resolve(import.meta.dirname, "..");
 const REPO_ROOT = path.resolve(WEB_ROOT, "..");
@@ -100,7 +101,7 @@ try {
   const consumer = await call(on, "POST", "/api/kb/consumer", CONSUMER_ID, { question: "Which current business records should I keep consistent?" });
   equal(consumer.status, 200, "consumer answer succeeds"); equal(consumer.payload?.status, "answered", "consumer answer is grounded"); equal(consumer.payload?.identity, CONSUMER_KB_IDENTITY, "consumer answer identifies AI"); check(Array.isArray(consumer.payload?.citations) && consumer.payload.citations.length > 0, "consumer answer has citations");
   const empty = await call(on, "POST", "/api/kb/consumer", CONSUMER_ID, { question: "orchid" });
-  equal(empty.payload?.status, "insufficient_grounding", "isolated query declines without grounding");
+  equal(empty.payload?.status, CONSUMER_ASSISTANT_FAILURE_COPY.ASSISTANT_NO_MATCHING_RECORDS.status, "isolated query declines without grounding");
   equal((await call(on, "POST", "/api/kb/consumer", OPERATOR_A_ID, { question: "business records" })).status, 403, "consumer route refuses operator role");
 
   const answerA = await call(on, "POST", "/api/kb/operator", OPERATOR_A_ID, { mode: "answer", question: "What workspace item is visible?" });
