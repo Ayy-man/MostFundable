@@ -5,6 +5,7 @@ import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
 import { KB_NDJSON_CONTENT_TYPE, readKbStreamLines } from "../src/lib/kb/stream.ts";
+import { KB_EMBEDDING_DRIVERS } from "../src/lib/kb/retrieval.ts";
 
 const WEB_ROOT = path.resolve(import.meta.dirname, "..");
 const REPO_ROOT = path.resolve(WEB_ROOT, "..");
@@ -55,6 +56,7 @@ async function start(flagOn) {
   // The driver values are the fallbacks declared in `src/lib/env.ts` (`ai` falls back to "mock",
   // `vault` to "fixture"), which is what deleting the selector was reaching for.
   env.FEATURE_KB = "0"; env.FEATURE_REAL_AUTH = "0"; env.AI_DRIVER = "mock"; env.VAULT_DRIVER = "fixture";
+  env[KB_EMBEDDING_DRIVERS.selector] = KB_EMBEDDING_DRIVERS.fallback;
   if (flagOn) { env.FEATURE_KB = "1"; env.FEATURE_SUPPORT = "1"; }
   const child = spawn(path.join(WEB_ROOT, "node_modules/.bin/next"), ["start", "-p", String(port)], { cwd: WEB_ROOT, detached: true, env, stdio: "ignore" });
   children.push(child);

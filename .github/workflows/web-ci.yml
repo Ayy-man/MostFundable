@@ -89,9 +89,16 @@ jobs:
         working-directory: web
         env:
           ADMIN_E2E: "1"
+          MF_BILLING_E2E_LOG: ${{ runner.temp }}/mostfundable-e2e.log
           MF_TENANCY_MAIL_E2E: "1"
           REVENUE_E2E: "1"
-        run: npm run test:e2e
+        run: |
+          status=0
+          npm run test:e2e || status=$?
+          if [ "$status" -ne 0 ] && [ -f "$MF_BILLING_E2E_LOG" ]; then
+            awk '/route_failure|Error:|TypeError:|ReferenceError:|SyntaxError:/' "$MF_BILLING_E2E_LOG" | tail -200
+          fi
+          exit "$status"
 
       - name: Source and product gates
         working-directory: web
