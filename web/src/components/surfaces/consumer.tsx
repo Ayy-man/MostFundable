@@ -2135,7 +2135,7 @@ function JourneyTimeline({ analysisActive, canceled, currentStage, durable }: { 
               <li className="grid grid-cols-[36px_minmax(0,1fr)] gap-4" key={stage.name}>
                 <div className="flex flex-col items-center">
                   <JourneyStepIcon reducedMotion={stillCurrent} stage={stage.name.toLowerCase() as JourneyStage} status={iconStatus} />
-                  {index < stages.length - 1 ? <JourneyConnector flowing={complete} /> : null}
+                  {index < stages.length - 1 ? <JourneyConnector flowing={complete} stage={stage.name.toLowerCase() as JourneyStage} /> : null}
                 </div>
                 <div className="border-b border-[var(--consumer-border)] pb-6 last:border-0 last:pb-0">
                   <div className="flex flex-wrap items-center gap-2">

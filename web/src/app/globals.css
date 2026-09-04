@@ -815,11 +815,19 @@ input[type="radio"]:active:not(:disabled) {
 
 /* ---------------------------------------------------------------------------
    Funding journey stage icons (design handoff: Funding Journey Icons). One
-   motion per meaning, looping; node and halo share the same 36px border-box so
-   the ring cannot drift off-centre. Locked nodes carry none of these classes.
-   `data-motion="off"` (the component's reducedMotion prop) and the OS reduce
-   setting both pause in place rather than strip the keyframes, so a paused node
-   still reads as the same icon.
+   motion per meaning. Node and halo share the same 36px border-box so the ring
+   cannot drift off-centre.
+
+   Two regimes. The current stage loops, paced by `--mf-journey-pace` (1.6x the
+   handoff timings, so it reads as ambient rather than busy), and it is the only
+   node that carries a halo. A completed stage plays the `-once` variant a single
+   time on first mount and settles into the finished glyph: signature drawn and
+   stamped, dial at 83, knob at the gate, all three rows lit, deposit landed,
+   orbit back at the top. The component records that play so a later remount in
+   the same session renders the settled glyph directly. Locked nodes carry none
+   of these classes. `data-motion="off"` (the reducedMotion prop) and the OS
+   reduce setting pause in place rather than strip the keyframes, so a paused
+   node still reads as the same icon.
    --------------------------------------------------------------------------- */
 @keyframes mf-journey-sign { 0%{stroke-dashoffset:62} 42%{stroke-dashoffset:0} 88%{stroke-dashoffset:0;opacity:1} 94%{opacity:0} 95%{stroke-dashoffset:62;opacity:0} 100%{stroke-dashoffset:62;opacity:1} }
 @keyframes mf-journey-stamp { 0%,40%{transform:scale(0);opacity:0} 52%{transform:scale(1.15);opacity:1} 60%{transform:scale(1);opacity:1} 88%{opacity:1} 94%,100%{opacity:0} }
@@ -835,36 +843,88 @@ input[type="radio"]:active:not(:disabled) {
 @keyframes mf-journey-flow { to{background-position:0 14px} }
 @keyframes mf-journey-breathe { 0%,100%{opacity:.45} 50%{opacity:.9} }
 
-.mf-journey-node .mf-journey-sign { animation: mf-journey-sign 6s ease-in-out infinite; }
-.mf-journey-node .mf-journey-stamp { animation: mf-journey-stamp 6s ease-out infinite; }
-.mf-journey-node .mf-journey-dial { animation: mf-journey-dial 5s cubic-bezier(.4,0,.2,1) infinite; }
-.mf-journey-node .mf-journey-tip { animation: mf-journey-tip 5s cubic-bezier(.4,0,.2,1) infinite; }
-.mf-journey-node .mf-journey-slide { animation: mf-journey-slide 5s cubic-bezier(.65,0,.35,1) infinite; }
-.mf-journey-node .mf-journey-gate { animation: mf-journey-gate 5s ease-in-out infinite; }
-.mf-journey-node .mf-journey-dot { animation: mf-journey-dot 4.5s ease-in-out infinite; }
-.mf-journey-node .mf-journey-drop { animation: mf-journey-drop 4.8s cubic-bezier(.5,0,.3,1) infinite; }
-.mf-journey-node .mf-journey-ripple { animation: mf-journey-ripple 4.8s ease-out infinite; }
-.mf-journey-node .mf-journey-orbit { animation: mf-journey-orbit 5s linear infinite; }
-.mf-journey-halo { animation: mf-journey-halo 5s ease-out infinite; }
+/* One-shot variants: same choreography up to the hold, then stay there. */
+@keyframes mf-journey-sign-once { 0%{stroke-dashoffset:62} 70%,100%{stroke-dashoffset:0} }
+@keyframes mf-journey-stamp-once { 0%,66%{transform:scale(0);opacity:0} 86%{transform:scale(1.15);opacity:1} 100%{transform:scale(1);opacity:1} }
+@keyframes mf-journey-dial-once { 0%{stroke-dashoffset:40} 100%{stroke-dashoffset:6.8} }
+@keyframes mf-journey-tip-once { 0%{transform:rotate(0)} 100%{transform:rotate(224deg)} }
+@keyframes mf-journey-slide-once { 0%{transform:translateX(0)} 100%{transform:translateX(13px)} }
+@keyframes mf-journey-gate-once { 0%,88%{transform:scale(1);opacity:.5} 94%{transform:scale(1.5);opacity:1} 100%{transform:scale(1);opacity:1} }
+@keyframes mf-journey-dot-once { 0%{opacity:0} 100%{opacity:1} }
+@keyframes mf-journey-drop-once { 0%{transform:translateY(-5px);opacity:0} 75%{transform:translateY(0);opacity:1} 85%{transform:translateY(.6px)} 100%{transform:translateY(0);opacity:1} }
+@keyframes mf-journey-ripple-once { 0%,70%{transform:scale(.35);opacity:0} 78%{opacity:.9} 100%{transform:scale(1);opacity:0} }
+
+.mf-journey-node { --mf-journey-pace: 1; }
+.mf-journey-node[data-status="active"] { --mf-journey-pace: 1.6; }
+
+.mf-journey-node .mf-journey-sign { animation: mf-journey-sign calc(6s * var(--mf-journey-pace)) ease-in-out infinite; }
+.mf-journey-node .mf-journey-stamp { animation: mf-journey-stamp calc(6s * var(--mf-journey-pace)) ease-out infinite; }
+.mf-journey-node .mf-journey-dial { animation: mf-journey-dial calc(5s * var(--mf-journey-pace)) cubic-bezier(.4,0,.2,1) infinite; }
+.mf-journey-node .mf-journey-tip { animation: mf-journey-tip calc(5s * var(--mf-journey-pace)) cubic-bezier(.4,0,.2,1) infinite; }
+.mf-journey-node .mf-journey-slide { animation: mf-journey-slide calc(5s * var(--mf-journey-pace)) cubic-bezier(.65,0,.35,1) infinite; }
+.mf-journey-node .mf-journey-gate { animation: mf-journey-gate calc(5s * var(--mf-journey-pace)) ease-in-out infinite; }
+.mf-journey-node .mf-journey-dot { animation: mf-journey-dot calc(4.5s * var(--mf-journey-pace)) ease-in-out infinite; }
+.mf-journey-node .mf-journey-drop { animation: mf-journey-drop calc(4.8s * var(--mf-journey-pace)) cubic-bezier(.5,0,.3,1) infinite; }
+.mf-journey-node .mf-journey-ripple { animation: mf-journey-ripple calc(4.8s * var(--mf-journey-pace)) ease-out infinite; }
+.mf-journey-node .mf-journey-orbit { animation: mf-journey-orbit calc(5s * var(--mf-journey-pace)) linear infinite; }
+.mf-journey-node .mf-journey-halo { animation: mf-journey-halo calc(2.8s * var(--mf-journey-pace)) ease-out infinite; }
+
+/* Completed stage, first mount: play once and hold the finished frame. The
+   Applying rows keep their 0 / .6s / 1.2s stagger from the inline delays. */
+.mf-journey-node[data-once="play"] .mf-journey-sign { animation: mf-journey-sign-once 2.4s ease-in-out 1 forwards; }
+.mf-journey-node[data-once="play"] .mf-journey-stamp { animation: mf-journey-stamp-once 2.4s ease-out 1 forwards; }
+.mf-journey-node[data-once="play"] .mf-journey-dial { animation: mf-journey-dial-once 2s cubic-bezier(.4,0,.2,1) 1 forwards; }
+.mf-journey-node[data-once="play"] .mf-journey-tip { animation: mf-journey-tip-once 2s cubic-bezier(.4,0,.2,1) 1 forwards; }
+.mf-journey-node[data-once="play"] .mf-journey-slide { animation: mf-journey-slide-once 1.6s cubic-bezier(.65,0,.35,1) 1 forwards; }
+.mf-journey-node[data-once="play"] .mf-journey-gate { animation: mf-journey-gate-once 2s ease-in-out 1 forwards; }
+.mf-journey-node[data-once="play"] .mf-journey-dot { animation: mf-journey-dot-once .6s ease-in-out 1 forwards; }
+.mf-journey-node[data-once="play"] .mf-journey-drop { animation: mf-journey-drop-once 1.6s cubic-bezier(.5,0,.3,1) 1 forwards; }
+.mf-journey-node[data-once="play"] .mf-journey-ripple { animation: mf-journey-ripple-once 1.8s ease-out 1 forwards; }
+.mf-journey-node[data-once="play"] .mf-journey-orbit { animation: mf-journey-orbit 2.4s cubic-bezier(.4,0,.2,1) 1; }
+
+/* Completed stage, already played this session: the settled glyph, no motion. */
+.mf-journey-node[data-once="done"] .mf-journey-sign { animation: none; stroke-dashoffset: 0; }
+.mf-journey-node[data-once="done"] .mf-journey-stamp { animation: none; }
+.mf-journey-node[data-once="done"] .mf-journey-dial { animation: none; stroke-dashoffset: 6.8; }
+.mf-journey-node[data-once="done"] .mf-journey-tip { animation: none; transform: rotate(224deg); }
+.mf-journey-node[data-once="done"] .mf-journey-slide { animation: none; transform: translateX(13px); }
+.mf-journey-node[data-once="done"] .mf-journey-gate { animation: none; }
+.mf-journey-node[data-once="done"] .mf-journey-dot { animation: none; }
+.mf-journey-node[data-once="done"] .mf-journey-drop { animation: none; }
+.mf-journey-node[data-once="done"] .mf-journey-ripple { animation: none; opacity: 0; }
+.mf-journey-node[data-once="done"] .mf-journey-orbit { animation: none; }
 
 .mf-journey-connector { background-image: repeating-linear-gradient(180deg, #d1d5db 0 4px, transparent 4px 10px); }
 .mf-journey-connector-flow {
   background-image: repeating-linear-gradient(180deg, #22c55e 0 6px, rgba(34,197,94,.18) 6px 14px);
   background-size: 2px 14px;
-  animation: mf-journey-flow 1.4s linear infinite;
 }
-.mf-journey-breathe { animation: mf-journey-breathe 2s ease-in-out infinite; }
+/* The flow into the current stage runs three passes on first open, then rests. */
+.mf-journey-connector-flow[data-once="play"] { animation: mf-journey-flow 1.4s linear 3; }
+.mf-journey-breathe { animation: mf-journey-breathe 3.2s ease-in-out infinite; }
 
-[data-motion="off"].mf-journey-node *,
-[data-motion="off"].mf-journey-connector,
+/* Reduced motion. Looping nodes pause in place. A one-shot node must not pause
+   at its first frame (an empty dial, an undrawn signature), so its animations
+   collapse to zero duration and the `forwards` fill lands it on the finished
+   glyph immediately. */
+[data-motion="off"].mf-journey-node[data-status="active"] *,
 [data-motion="off"].mf-journey-breathe {
   animation-play-state: paused;
 }
+[data-motion="off"].mf-journey-node[data-once="play"] *,
+[data-motion="off"].mf-journey-connector-flow[data-once="play"] {
+  animation-duration: 0s;
+  animation-delay: 0s;
+}
 
 @media (prefers-reduced-motion: reduce) {
-  .mf-journey-node *,
-  .mf-journey-connector,
+  .mf-journey-node[data-status="active"] *,
   .mf-journey-breathe {
     animation-play-state: paused;
+  }
+  .mf-journey-node[data-once="play"] *,
+  .mf-journey-connector-flow[data-once="play"] {
+    animation-duration: 0s;
+    animation-delay: 0s;
   }
 }

@@ -2,12 +2,20 @@ import { cn } from "@/lib/utils";
 
 /*
  * Bespoke stage icons for the "Your funding journey" stepper (design handoff:
- * Funding Journey Icons). Geometry, timings and colours are final and match the
- * reference pixel-for-pixel; the keyframes live in globals.css under the
- * `mf-journey-*` prefix. Only `complete` and `active` nodes animate -- a locked
- * node is static grey, and `prefers-reduced-motion` (or the `reducedMotion`
- * prop) pauses everything in place rather than removing it.
+ * Funding Journey Icons). Geometry and colours match the reference; the
+ * keyframes live in globals.css under the `mf-journey-*` prefix.
+ *
+ * Motion regimes. The current stage loops (slowly) and is the only node with a
+ * halo. A completed stage plays its motion once on the first mount of the
+ * session and settles into the finished glyph; later mounts render the settled
+ * glyph directly. Locked nodes are static grey. `prefers-reduced-motion` and the
+ * `reducedMotion` prop pause the loop in place and skip the one-shot to its end.
  */
+
+/* Which completed stages (and flowing connectors) have already played this
+   session. Written only from animation-end handlers, so it stays empty on the
+   server and on the client's first paint, and hydration always agrees. */
+const playedOnce = new Set<string>();
 
 export type JourneyStage = "onboarding" | "optimization" | "ready" | "applying" | "funded" | "graduate";
 export type JourneyStatus = "complete" | "active" | "locked";
@@ -18,10 +26,6 @@ const NODE_STYLES: Record<JourneyStatus, string> = {
   locked: "border border-[#e5e7eb] bg-white",
 };
 
-const HALO: Record<Exclude<JourneyStatus, "locked">, { color: string; duration: string }> = {
-  complete: { color: "#22c55e", duration: "5s" },
-  active: { color: "#4ade80", duration: "2.8s" },
-};
 
 type Palette = {
   ink: string; // primary stroke
@@ -158,19 +162,18 @@ export function JourneyStepIcon({
 }) {
   // Locked Ready keeps a slightly darker stroke so the empty gate ring stays legible.
   const stroke = status === "locked" && stage === "ready" ? "#6b7280" : PALETTES[status].ink;
-  const halo = status === "locked" ? null : HALO[status];
+  const onceKey = `node:${stage}`;
+  const once = status === "complete" ? (playedOnce.has(onceKey) ? "done" : "play") : undefined;
   return (
     <span
       aria-hidden
       className="mf-journey-node relative block size-9 shrink-0"
       data-motion={reducedMotion ? "off" : undefined}
+      data-once={once}
+      data-status={status}
+      onAnimationEnd={once === "play" ? () => playedOnce.add(onceKey) : undefined}
     >
-      {halo ? (
-        <span
-          className="mf-journey-halo absolute inset-0 box-border rounded-full"
-          style={{ animationDuration: halo.duration, background: halo.color }}
-        />
-      ) : null}
+      {status === "active" ? <span className="mf-journey-halo absolute inset-0 box-border rounded-full bg-[#4ade80]" /> : null}
       <span className={cn("absolute inset-0 box-border flex items-center justify-center rounded-full", NODE_STYLES[status])}>
         <svg
           fill="none"
@@ -189,14 +192,19 @@ export function JourneyStepIcon({
   );
 }
 
-/* The vertical rule between nodes. Flowing only from a complete step into the
-   next one; everywhere else a static dotted grey rule. */
-export function JourneyConnector({ flowing, reducedMotion = false }: { flowing: boolean; reducedMotion?: boolean }) {
+/* The vertical rule between nodes. Green out of a complete step (flowing for a
+   few passes on first open, then still); a static dotted grey rule elsewhere.
+   `stage` is the step the rule leaves, so each rule remembers its own play. */
+export function JourneyConnector({ flowing, reducedMotion = false, stage }: { flowing: boolean; reducedMotion?: boolean; stage: JourneyStage }) {
+  const onceKey = `rule:${stage}`;
+  const once = flowing ? (playedOnce.has(onceKey) ? "done" : "play") : undefined;
   return (
     <span
       aria-hidden
       className={cn("mf-journey-connector my-[5px] w-[2px] flex-1 rounded-[2px]", flowing && "mf-journey-connector-flow")}
       data-motion={reducedMotion ? "off" : undefined}
+      data-once={once}
+      onAnimationEnd={once === "play" ? () => playedOnce.add(onceKey) : undefined}
     />
   );
 }
