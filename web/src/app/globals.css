@@ -812,3 +812,59 @@ input[type="radio"]:active:not(:disabled) {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Funding journey stage icons (design handoff: Funding Journey Icons). One
+   motion per meaning, looping; node and halo share the same 36px border-box so
+   the ring cannot drift off-centre. Locked nodes carry none of these classes.
+   `data-motion="off"` (the component's reducedMotion prop) and the OS reduce
+   setting both pause in place rather than strip the keyframes, so a paused node
+   still reads as the same icon.
+   --------------------------------------------------------------------------- */
+@keyframes mf-journey-sign { 0%{stroke-dashoffset:62} 42%{stroke-dashoffset:0} 88%{stroke-dashoffset:0;opacity:1} 94%{opacity:0} 95%{stroke-dashoffset:62;opacity:0} 100%{stroke-dashoffset:62;opacity:1} }
+@keyframes mf-journey-stamp { 0%,40%{transform:scale(0);opacity:0} 52%{transform:scale(1.15);opacity:1} 60%{transform:scale(1);opacity:1} 88%{opacity:1} 94%,100%{opacity:0} }
+@keyframes mf-journey-dial { 0%{stroke-dashoffset:40} 55%{stroke-dashoffset:6.8} 85%{stroke-dashoffset:6.8} 100%{stroke-dashoffset:40} }
+@keyframes mf-journey-tip { 0%{transform:rotate(0)} 55%{transform:rotate(224deg)} 85%{transform:rotate(224deg)} 100%{transform:rotate(0)} }
+@keyframes mf-journey-slide { 0%{transform:translateX(0)} 45%{transform:translateX(13px)} 78%{transform:translateX(13px)} 100%{transform:translateX(0)} }
+@keyframes mf-journey-gate { 0%,40%{transform:scale(1);opacity:.5} 50%{transform:scale(1.5);opacity:1} 62%{transform:scale(1);opacity:1} 78%{opacity:1} 100%{opacity:.5} }
+@keyframes mf-journey-dot { 0%{opacity:0} 14%{opacity:1} 76%{opacity:1} 92%,100%{opacity:0} }
+@keyframes mf-journey-drop { 0%{transform:translateY(-5px);opacity:0} 30%{transform:translateY(0);opacity:1} 34%{transform:translateY(.6px)} 40%{transform:translateY(0)} 82%{opacity:1} 100%{transform:translateY(0);opacity:0} }
+@keyframes mf-journey-ripple { 0%,28%{transform:scale(.35);opacity:0} 34%{opacity:.9} 72%{transform:scale(1);opacity:0} 100%{transform:scale(1);opacity:0} }
+@keyframes mf-journey-orbit { to{transform:rotate(360deg)} }
+@keyframes mf-journey-halo { 0%{transform:scale(1);opacity:.45} 70%,100%{transform:scale(1.9);opacity:0} }
+@keyframes mf-journey-flow { to{background-position:0 14px} }
+@keyframes mf-journey-breathe { 0%,100%{opacity:.45} 50%{opacity:.9} }
+
+.mf-journey-node .mf-journey-sign { animation: mf-journey-sign 6s ease-in-out infinite; }
+.mf-journey-node .mf-journey-stamp { animation: mf-journey-stamp 6s ease-out infinite; }
+.mf-journey-node .mf-journey-dial { animation: mf-journey-dial 5s cubic-bezier(.4,0,.2,1) infinite; }
+.mf-journey-node .mf-journey-tip { animation: mf-journey-tip 5s cubic-bezier(.4,0,.2,1) infinite; }
+.mf-journey-node .mf-journey-slide { animation: mf-journey-slide 5s cubic-bezier(.65,0,.35,1) infinite; }
+.mf-journey-node .mf-journey-gate { animation: mf-journey-gate 5s ease-in-out infinite; }
+.mf-journey-node .mf-journey-dot { animation: mf-journey-dot 4.5s ease-in-out infinite; }
+.mf-journey-node .mf-journey-drop { animation: mf-journey-drop 4.8s cubic-bezier(.5,0,.3,1) infinite; }
+.mf-journey-node .mf-journey-ripple { animation: mf-journey-ripple 4.8s ease-out infinite; }
+.mf-journey-node .mf-journey-orbit { animation: mf-journey-orbit 5s linear infinite; }
+.mf-journey-halo { animation: mf-journey-halo 5s ease-out infinite; }
+
+.mf-journey-connector { background-image: repeating-linear-gradient(180deg, #d1d5db 0 4px, transparent 4px 10px); }
+.mf-journey-connector-flow {
+  background-image: repeating-linear-gradient(180deg, #22c55e 0 6px, rgba(34,197,94,.18) 6px 14px);
+  background-size: 2px 14px;
+  animation: mf-journey-flow 1.4s linear infinite;
+}
+.mf-journey-breathe { animation: mf-journey-breathe 2s ease-in-out infinite; }
+
+[data-motion="off"].mf-journey-node *,
+[data-motion="off"].mf-journey-connector,
+[data-motion="off"].mf-journey-breathe {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mf-journey-node *,
+  .mf-journey-connector,
+  .mf-journey-breathe {
+    animation-play-state: paused;
+  }
+}

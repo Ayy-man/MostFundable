@@ -51,6 +51,7 @@ import {
   StatusTag,
   WorkspaceSection,
 } from "@/components/consumer/consumer-kit";
+import { JourneyActiveDot, JourneyConnector, JourneyStepIcon, type JourneyStage } from "@/components/consumer/journey-step-icon";
 import { DurableOptimizationView } from "@/components/consumer/optimization-view";
 import {
   ConsumerTrainingsView,
@@ -2126,26 +2127,23 @@ function JourneyTimeline({ analysisActive, canceled, currentStage, durable }: { 
           {stages.map((stage, index) => {
             const complete = stage.status === "Complete";
             const active = stage.status === "Active" || stage.status === "Paused";
-            const markerState = complete
-              ? "verified"
-              : stage.status === "Active"
-                ? "active"
-                : stage.status === "Paused" || stage.status === "Frozen"
-                  ? "paused"
-                  : "locked";
+            // Paused and Frozen are the current stage with its motion stopped: the node keeps the
+            // active treatment so the reader still sees where they are, but nothing loops.
+            const iconStatus = complete ? "complete" : stage.status === "Locked" ? "locked" : "active";
+            const stillCurrent = stage.status === "Paused" || stage.status === "Frozen";
             return (
-              <li className="grid grid-cols-[2rem_minmax(0,1fr)] gap-4" key={stage.name}>
+              <li className="grid grid-cols-[36px_minmax(0,1fr)] gap-4" key={stage.name}>
                 <div className="flex flex-col items-center">
-                  <StateMarker state={markerState} />
-                  {index < stages.length - 1 ? <span className={cn("w-px flex-1", complete ? "bg-[var(--consumer-positive)]" : "bg-[var(--consumer-border)]")} /> : null}
+                  <JourneyStepIcon reducedMotion={stillCurrent} stage={stage.name.toLowerCase() as JourneyStage} status={iconStatus} />
+                  {index < stages.length - 1 ? <JourneyConnector flowing={complete} /> : null}
                 </div>
                 <div className="border-b border-[var(--consumer-border)] pb-6 last:border-0 last:pb-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <h2 className="text-sm font-semibold">{stage.name}</h2>
-                    <StatusTag icon={complete || stage.status === "Active" || stage.status === "Paused" || stage.status === "Frozen" ? undefined : false} tone={complete ? "success" : stage.status === "Active" ? "info" : "neutral"}>{stage.status}</StatusTag>
-                    <span className="ml-auto text-xs text-muted-foreground">{stage.date}</span>
+                    <StatusTag icon={stage.status === "Active" ? <JourneyActiveDot /> : complete || stillCurrent ? undefined : false} tone={complete ? "success" : stage.status === "Active" ? "info" : "neutral"}>{stage.status}</StatusTag>
+                    <span className="ml-auto shrink-0 whitespace-nowrap text-xs text-muted-foreground">{stage.date}</span>
                   </div>
-                  <p className="mt-2 text-xs leading-5 text-muted-foreground">{stage.detail}</p>
+                  <p className="mt-2 text-xs leading-5 text-muted-foreground [text-wrap:pretty]">{stage.detail}</p>
                   {active && stage.name === "Optimization" && !durable ? (
                     <div className="mt-4 grid gap-2 rounded-[8px] bg-[var(--consumer-canvas)] p-3 text-xs sm:grid-cols-3">
                       <span className="flex items-center gap-2"><StateMarker size="sm" state="todo" /> Utilization: open</span>
