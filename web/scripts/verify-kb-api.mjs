@@ -4,6 +4,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
+import { KB_NDJSON_CONTENT_TYPE, readKbStreamLines } from "../src/lib/kb/stream.ts";
+
 const WEB_ROOT = path.resolve(import.meta.dirname, "..");
 const REPO_ROOT = path.resolve(WEB_ROOT, "..");
 const ADMIN_ID = "00000000-0000-0000-0000-000000000001";
@@ -66,7 +68,13 @@ async function call(base, method, route, profileId, body) {
   const target = new URL(route, base);
   const response = await fetch(target, { method, headers: { ...(profileId ? { "x-mf-demo-profile-id": profileId } : {}), ...(body === undefined ? {} : { "content-type": "application/json" }), ...(!["GET", "HEAD"].includes(method) ? { origin: new URL(base).origin } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) });
   const text = await response.text();
-  let payload = null; try { payload = JSON.parse(text); } catch {}
+  let payload = null;
+  if ((response.headers.get("content-type") ?? "").includes(KB_NDJSON_CONTENT_TYPE)) {
+    const terminal = readKbStreamLines(text).events.findLast((event) => "result" in event);
+    payload = terminal && "result" in terminal ? terminal.result : null;
+  } else {
+    try { payload = JSON.parse(text); } catch {}
+  }
   return { status: response.status, payload };
 }
 

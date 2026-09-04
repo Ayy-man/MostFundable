@@ -328,7 +328,8 @@ describe("job drainer", () => {
   it("hands back rows it has no budget to start without spending their attempt", { timeout: 10_000 }, async () => {
     const second = "22222222-2222-4222-8222-222222222222";
     const third = "33333333-3333-4333-8333-333333333333";
-    const fake = fakeRepository([job(), job({ id: second }), job({ id: third })]);
+    const claimed = [job(), job({ id: second }), job({ id: third })];
+    const fake = fakeRepository(claimed);
     const renewed: string[] = [];
     const repository = {
       ...fake.repository,
@@ -342,16 +343,25 @@ describe("job drainer", () => {
       return { status: "ok", rows: 1 };
     }, "FEATURE_REVENUE");
 
-    const result = await drainJobs({ budgetMs: 50, workerId: "worker" }, { ...fake, repository });
+    // The real timer proves that the first handler reaches its deadline. The
+    // injected wall clock then places every later row past the same budget
+    // boundary without depending on CI scheduler precision.
+    const ticks = [0, 0, 50, 51, 52];
+    const now = () => ticks.shift() ?? 52;
+    const result = await drainJobs({ budgetMs: 50, now, workerId: "worker" }, { ...fake, repository });
 
-    assert.equal(result.deferred, 2, "the budget is gone by the time the first row's deadline fires");
-    assert.deepEqual(renewed, [UUID], "an unstarted row is never renewed, so it never counts an attempt");
+    assert.equal(
+      result.deferred,
+      claimed.length - renewed.length,
+      "every claimed row the rule did not renew is reported as deferred",
+    );
+    assert.deepEqual(renewed, [claimed[0].id], "an unstarted row is never renewed, so it never counts an attempt");
     assert.deepEqual(
       fake.events.filter((event) => event.kind === "fail").map((event) => (event.value as { jobId: string }).jobId),
-      [UUID],
+      [claimed[0].id],
       "only the row that actually ran is failed; the rest are handed back untouched",
     );
-    assert.deepEqual([second, third].filter((id) => renewed.includes(id)), []);
+    assert.deepEqual(claimed.slice(1).filter((row) => renewed.includes(row.id)), []);
   });
 
   it("passes only enabled handler names to claims so disabled work stays queued", async () => {
