@@ -22,6 +22,7 @@ import path from "node:path";
 import { test } from "node:test";
 
 import { CHAT_SHORTCUTS } from "@/components/chat/shortcuts";
+import { INBOX_FRAME_CLASS } from "./layout";
 
 const HERE = path.join(process.cwd(), "src/components/operator/inbox");
 const REALTIME_MODULE = path.join(process.cwd(), "src/lib/realtime/support.client.ts");
@@ -43,6 +44,29 @@ function inboxSource(): string {
   assert.ok(names.length > 1, "the Inbox directory no longer holds the Inbox");
   return names.map((name) => readFileSync(path.join(HERE, name), "utf8")).join("\n");
 }
+
+test("keeps the mobile conversation and reply composer inside a viewport-sized frame", () => {
+  const rules = INBOX_FRAME_CLASS.split(/\s+/);
+  assert.ok(
+    rules.some((rule) => /^h-\[[^\]]*dvh[^\]]*\]$/.test(rule)),
+    "the Inbox layout rule has no base viewport height for the 390-wide conversation",
+  );
+  assert.ok(
+    rules.includes("overflow-hidden"),
+    "the Inbox frame does not contain its scrolling message pane",
+  );
+
+  const source = withoutComments(readFileSync(path.join(HERE, "index.tsx"), "utf8"));
+  assert.match(
+    source,
+    /import \{ INBOX_FRAME_CLASS \} from "\.\/layout"/,
+    "the Inbox does not import the viewport rule",
+  );
+  assert.ok(
+    (source.match(/INBOX_FRAME_CLASS/g) ?? []).length >= 2,
+    "the Inbox frame bypasses the viewport rule, so the reply composer can follow messages below the fold",
+  );
+});
 
 test("splits client replies from internal team messages without changing their durable visibility", () => {
   const source = withoutComments(inboxSource());

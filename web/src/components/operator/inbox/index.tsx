@@ -82,6 +82,7 @@ import { cn } from "@/lib/utils";
 
 import { ConversationPane, STATUS_CONTROL_ID, composerRef, type ComposerTab, type HeldDraft } from "./conversation-pane";
 import { CopilotRail, RailSkeleton, type RailTab } from "./copilot-rail";
+import { INBOX_FRAME_CLASS } from "./layout";
 import { ThreadListPane } from "./thread-list-pane";
 import {
   authorFor,
@@ -1494,8 +1495,8 @@ export function OperatorInbox({
       */}
       <div
         className={cn(
-          "grid min-h-[34rem] overflow-hidden rounded-[10px] border border-[var(--border)] bg-card",
-          "lg:h-[calc(100dvh-var(--demo-banner-height,0px)-17rem)]",
+          "grid rounded-[10px] border border-[var(--border)] bg-card",
+          INBOX_FRAME_CLASS,
           railCollapsed
             ? "xl:grid-cols-[18rem_minmax(0,1fr)_3.25rem]"
             : "xl:grid-cols-[18rem_minmax(0,1fr)_18rem]",

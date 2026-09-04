@@ -20,6 +20,7 @@ import { useCallback, useEffect } from "react";
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
 
 import { Button } from "@/components/ui/button";
+import { CHAT_SCROLL_BEHAVIOR } from "@/components/chat/scroll-behavior";
 import { cn } from "@/lib/utils";
 
 /**
@@ -70,8 +71,8 @@ export type ConversationProps = ComponentProps<typeof StickToBottom>;
 export const Conversation = ({ children, className, ...props }: ConversationProps) => (
   <StickToBottom
     className={cn("relative flex min-h-0 flex-1 flex-col overflow-y-hidden", className)}
-    initial="smooth"
-    resize="smooth"
+    initial={CHAT_SCROLL_BEHAVIOR.initial}
+    resize={CHAT_SCROLL_BEHAVIOR.resize}
     role="log"
     {...props}
   >

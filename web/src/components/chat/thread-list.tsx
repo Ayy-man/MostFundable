@@ -31,6 +31,7 @@ import { cn } from "@/lib/utils";
 
 import { PaneSkeletonBar, PaneState, type PaneAction } from "./pane-state";
 import { MessageTime } from "./message-thread";
+import { threadPreview } from "./thread-preview";
 import type { ChatThreadStatus, ChatThreadSummary } from "./types";
 
 // ---------------------------------------------------------------------------------------------
@@ -152,7 +153,7 @@ export function ThreadListItem({ className, onSelect, selected, thread }: Thread
             </span>
           ) : null}
           <span className="min-w-0 flex-1 basis-36 truncate text-xs text-muted-foreground">
-            {thread.preview ?? thread.subtitle ?? "No messages yet"}
+            {threadPreview(thread)}
           </span>
           {unread ? (
             <span className="shrink-0 rounded-full bg-[var(--primary-ink)] px-1.5 py-0.5 text-xs font-semibold tabular-nums text-[var(--background)]">
