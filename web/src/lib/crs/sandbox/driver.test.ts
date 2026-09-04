@@ -4,7 +4,14 @@ import { describe, it } from 'node:test';
 import { DRIVERS } from '../../env.ts';
 import { CrsConfigError, CrsDriverError } from '../errors.ts';
 import { createFixedClock } from '../ports.ts';
-import { CRS_SPEC_ERROR_CODES, CRS_SPEC_HOSTS } from '../spec-catalog.ts';
+import { sealCrsIdvContinuation } from '../continuation.ts';
+import {
+  CRS_SPEC_ERROR_CODES,
+  CRS_SPEC_HOSTS,
+  CRS_SPEC_SMFA_FAILURE_STATUSES,
+  CRS_SPEC_SMFA_PASS_STATUSES,
+  CRS_SPEC_SMFA_PENDING_STATUS,
+} from '../spec-catalog.ts';
 import { createSandboxAdapter, readSandboxConfigFromEnv } from './driver.ts';
 
 import type { CrsMemberRef } from '../types.ts';
@@ -27,6 +34,38 @@ function dependencies(fetchImpl: typeof fetch) {
     },
     fetchImpl,
   };
+}
+
+function smfaStatusAdapter(status: unknown) {
+  const secret = 'not-a-real-api-secret';
+  const requests: string[] = [];
+  const adapter = createSandboxAdapter({
+    baseUrl: CRS_SPEC_HOSTS.development.api,
+    apiKey: 'not-a-real-api-key',
+    exposeVerificationUrl: false,
+    secret,
+    timeoutMs: 1_000,
+  }, dependencies(async (input) => {
+    const requestUrl = String(input);
+    requests.push(requestUrl);
+    if (requestUrl.endsWith('/direct/login')) {
+      return Response.json({ token: 'direct-token', refresh: 'refresh-token', expires: 3600 });
+    }
+    if (requestUrl.includes('/direct/preauth-token/')) return Response.json({ token: 'preauth-token' });
+    if (requestUrl.includes('/users/preauth-token/')) return Response.json({ token: 'user-token' });
+    if (requestUrl.includes('/users/smfa-verify-status/')) return Response.json(status);
+    throw new Error(`unexpected request ${requestUrl}`);
+  }));
+  const continuation = sealCrsIdvContinuation({
+    challenge: {
+      kind: 'smfa_link',
+      attemptsRemaining: 1,
+      expiresAt: '2026-08-29T02:00:00.000Z',
+    },
+    memberRef: MEMBER,
+    smfaToken: 'smfa-token',
+  }, secret);
+  return { adapter, continuation, requests };
 }
 
 describe('CRS v3 sandbox boundary', () => {
@@ -103,6 +142,57 @@ describe('CRS v3 sandbox boundary', () => {
         assert.deepEqual(Object.keys(error).sort(), ['codes', 'driver', 'httpStatus', 'name', 'operation']);
         return true;
       },
+    );
+  });
+
+  for (const status of CRS_SPEC_SMFA_PASS_STATUSES) {
+    it(`passes the SMFA ${status} status fixture`, async () => {
+      const { adapter, continuation, requests } = smfaStatusAdapter({ status });
+
+      assert.deepEqual(
+        await adapter.submitIdvStep(MEMBER, { kind: 'smfa_status' }, continuation),
+        { outcome: 'pass', verifiedAt: '2026-08-29T01:00:00.000Z' },
+      );
+      assert.equal(requests.filter((request) => request.includes('/users/smfa-verify-status/')).length, 1);
+    });
+  }
+
+  it(`retries the same SMFA challenge for ${CRS_SPEC_SMFA_PENDING_STATUS}`, async () => {
+    const { adapter, continuation } = smfaStatusAdapter({ status: CRS_SPEC_SMFA_PENDING_STATUS });
+
+    assert.deepEqual(
+      await adapter.submitIdvStep(MEMBER, { kind: 'smfa_status' }, continuation),
+      {
+        outcome: 'retry',
+        challenge: {
+          kind: 'smfa_link',
+          attemptsRemaining: 1,
+          expiresAt: '2026-08-29T02:00:00.000Z',
+        },
+      },
+    );
+  });
+
+  for (const status of CRS_SPEC_SMFA_FAILURE_STATUSES) {
+    it(`returns a terminal failure for the SMFA ${status} status fixture`, async () => {
+      const { adapter, continuation } = smfaStatusAdapter({ status });
+
+      assert.deepEqual(
+        await adapter.submitIdvStep(MEMBER, { kind: 'smfa_status' }, continuation),
+        { outcome: 'failed', code: status },
+      );
+    });
+  }
+
+  it('fails closed when a successful SMFA response has no recognised status', async () => {
+    const { adapter, continuation } = smfaStatusAdapter({});
+
+    await assert.rejects(
+      () => adapter.submitIdvStep(MEMBER, { kind: 'smfa_status' }, continuation),
+      (error: unknown) => error instanceof CrsDriverError
+        && error.driver === 'sandbox'
+        && error.operation === 'submitIdvStep'
+        && error.httpStatus === 502,
     );
   });
 });

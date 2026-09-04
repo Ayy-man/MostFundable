@@ -42,8 +42,7 @@ export function createCrsAdapter(
  * run on the enrollment schedule rather than on each retrieval, so repeating the read is safe.
  */
 export function crsPullIsReplaySafe(adapter: CrsAdapter): boolean {
-  void adapter;
-  return true;
+  return adapter.pullBilling === 'cached-read';
 }
 
 let runtimeAdapter: CrsAdapter | null = null;

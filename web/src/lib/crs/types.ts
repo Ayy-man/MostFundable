@@ -71,6 +71,8 @@ export type IdvSubmission =
 export type IdvResult =
   | { outcome: 'pass'; verifiedAt: string }
   | { outcome: 'retry'; challenge: IdvChallengeState }
+  /** The provider completed SMFA but rejected the identity verification. */
+  | { outcome: 'failed'; code: 'ORANGE' | 'RED' }
   /** Maps to enrollments.status='parked' + parked_until (72h, §2.1). NO charge. */
   | { outcome: 'locked'; lockedUntil: string };
 
@@ -156,6 +158,8 @@ export interface SoftPullOptions {
 
 export interface CrsAdapter {
   readonly driver: CrsDriver;
+  /** Whether retrieving the latest report reuses the provider's cached read or bills per request. */
+  readonly pullBilling: 'cached-read' | 'per-request';
 
   /** Identity fields only. Returns the member handle + the first IDV challenge. */
   createMember(

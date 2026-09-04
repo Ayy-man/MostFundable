@@ -497,6 +497,13 @@ function eventForResult(state: EnrollmentState, value: IdvResult): MachineEvent 
       ? { kind: "idv_code_correct" }
       : { kind: "idv_answer_correct" };
   }
+  // A terminal CRS SMFA rejection spends an identity attempt exactly like an incorrect answer;
+  // the state machine owns subsequent retries and parking.
+  if (value.outcome === "failed") {
+    return state.view.idvState === "sms_sent"
+      ? { kind: "idv_code_wrong" }
+      : { kind: "idv_answer_wrong" };
+  }
   return state.view.idvState === "sms_sent"
     ? { kind: "idv_code_wrong" }
     : { kind: "idv_answer_wrong" };
