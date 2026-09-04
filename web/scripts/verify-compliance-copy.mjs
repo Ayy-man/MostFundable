@@ -105,13 +105,12 @@ const RULE_IDS = new Set(RULES.map((rule) => rule.id));
 // both directions, and `why` is asserted to be a real sentence because the
 // reason is the only thing that makes this reviewable six weeks from now.
 const ALLOWLIST = [
-  {
-    file: "web/src/components/surfaces/admin.tsx",
-    line: /not offers, predictions, or approval odds/,
-    rules: ["C10"],
-    expect: 1,
-    why: "Correct compliance copy: the panel states that its figures are recorded historical outcomes and explicitly disclaims the thing rule 4 bans. Rewording the disclaimer would remove the disclaimer; INTERFACES §5.2 forbids editing the file.",
-  },
+  // Entry removed with the admin surface's Industry updates tab. The line it
+  // covered — "not offers, predictions, or approval odds" — was the bank-trends
+  // panel's own disclaimer, and the panel went with the tab: it reviewed a
+  // staged-findings queue no pipeline feeds. A stale entry has to go rather
+  // than sit at zero, because the hit count is asserted in both directions.
+  //
   // Entry removed 2026-08-22 with the AI Brain chat playground's four scripted
   // replies. The line it covered — "the coach never gives approval odds" — was
   // correct compliance copy inside an answer no model produced, and the
@@ -985,8 +984,9 @@ function selfTest() {
       // when the admin chat playground's scripted replies went and took the sixth entry's single
       // suppressed line with them. 18 → 13 and five entries → two later the same day, when the
       // scripted workspace assistant was deleted: it had no caller left, and its three entries
-      // covered five lines of its own guardrail source.
-      line.startsWith("2 allow-list entries suppressed 13 hit(s) in 2 file(s)"),
+      // covered five lines of its own guardrail source. 13 → 12 and two entries → one when the
+      // admin surface's Industry updates tab went, taking the bank-trends disclaimer with it.
+      line.startsWith("1 allow-list entries suppressed 12 hit(s) in 1 file(s)"),
     ),
   );
 

@@ -110,7 +110,11 @@ describe("admin surface: every panel names a source or says it has none", () => 
   });
 
   it("holds no seeded audit row, staged finding, held reply or eval run", () => {
-    assert.match(CODE, /const INTEL_ITEMS: IntelItem\[\] = \[\];/);
+    // The staged-intel queue is gone entirely, along with the panel that
+    // reviewed it: an empty list still put a "0 pending" queue and a promote
+    // control in front of an administrator for a pipeline nothing feeds.
+    assert.equal(CODE.includes("INTEL_ITEMS"), false);
+    assert.equal(CODE.includes("type IntelItem"), false);
     assert.match(CODE, /const HELD_REPLIES: readonly HeldReply\[\] = \[\];/);
     assert.match(CODE, /useState<AuditEvent\[\]>\(\[\]\)/);
     assert.match(CODE, /useState<BankComment\[\]>\(\[\]\)/);
