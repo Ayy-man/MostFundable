@@ -124,14 +124,25 @@ describe("consumer notification preference repository", () => {
     assert.equal(preferences.length, 8);
     assert.equal(calls.filter((call) => call[0] === "from").length, 2);
 
-    await assert.rejects(
-      () => repository.save(PROFILE, {
-        email: true,
-        eventType: "document",
-        inApp: true,
-      }),
-      ConsumerNotificationPreferencesRepositoryError,
+    const opted = await repository.save(PROFILE, {
+      email: true,
+      eventType: "document",
+      inApp: true,
+    });
+    assert.deepEqual(
+      calls.filter((call) => call[0] === "upsert").at(-1),
+      [
+        "upsert",
+        {
+          email_enabled: true,
+          event_type: "document",
+          in_app_enabled: true,
+          profile_id: PROFILE,
+        },
+        { onConflict: "profile_id,event_type" },
+      ],
     );
+    assert.equal(opted.length, 8);
   });
 
   it("fails closed on database errors and malformed persisted rows", async () => {
@@ -149,15 +160,28 @@ describe("consumer notification preference repository", () => {
     );
     await assert.rejects(() => malformed.list(PROFILE), ConsumerNotificationPreferencesRepositoryError);
 
-    const unsupportedEmail = createConsumerNotificationPreferencesRepository(
+    // Email opt-in is a live choice now, so a persisted true reads back rather than failing closed.
+    const optedIn = createConsumerNotificationPreferencesRepository(
       () => database([{
         email_enabled: true,
         event_type: "team_message",
         in_app_enabled: true,
       }]).db,
     );
+    assert.deepEqual(
+      (await optedIn.list(PROFILE)).find((preference) => preference.eventType === "team_message"),
+      { email: true, eventType: "team_message", inApp: true },
+    );
+
+    const malformedEmail = createConsumerNotificationPreferencesRepository(
+      () => database([{
+        email_enabled: "yes",
+        event_type: "team_message",
+        in_app_enabled: true,
+      } as unknown as { email_enabled: boolean; event_type: string; in_app_enabled: boolean }]).db,
+    );
     await assert.rejects(
-      () => unsupportedEmail.list(PROFILE),
+      () => malformedEmail.list(PROFILE),
       ConsumerNotificationPreferencesRepositoryError,
     );
   });

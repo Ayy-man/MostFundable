@@ -70,23 +70,15 @@ describe("consumer notification preference handlers", () => {
     assert.deepEqual(calls, [["auth"], ["save", PROFILE, preference]]);
   });
 
-  it("refuses consumer email opt-in before auth because no dispatcher exists", async () => {
+  it("saves a consumer email opt-in now that the dispatcher exists", async () => {
     const { calls, dependencies } = harness();
+    const preference = { email: true, eventType: "team_message", inApp: true } as const;
     const response = await handleConsumerNotificationPreferencesPatch(new Request(
       "https://handover.invalid/api/notifications/preferences",
-      {
-        body: JSON.stringify({ email: true, eventType: "team_message", inApp: true }),
-        method: "PATCH",
-      },
+      { body: JSON.stringify(preference), method: "PATCH" },
     ), dependencies);
-    assert.equal(response.status, 409);
-    assert.deepEqual(await response.json(), {
-      error: {
-        code: "consumer_notification_email_unavailable",
-        message: "Email alerts are not connected to a consumer delivery service yet.",
-      },
-    });
-    assert.deepEqual(calls, []);
+    assert.equal(response.status, 200);
+    assert.deepEqual(calls, [["auth"], ["save", PROFILE, preference]]);
   });
 
   it("rejects widened input before auth and refuses non-consumer or unscoped sessions", async () => {

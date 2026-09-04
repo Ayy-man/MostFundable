@@ -153,8 +153,9 @@ export function ConsumerNotificationPreferences({
           that category until you turn it back on.
         </p>
         <p className="mt-1 max-w-[70ch] text-xs leading-5 text-muted-foreground">
-          Email alerts aren&apos;t connected to a consumer delivery service yet, so email stays off.
-          Requested password-reset emails are handled separately from these event preferences.
+          Email tells you the kind of update and asks you to sign in; it never carries amounts,
+          lender names or message text. Requested password-reset emails are handled separately from
+          these event preferences.
         </p>
 
         {visibleState === "loading" ? (
@@ -174,7 +175,7 @@ export function ConsumerNotificationPreferences({
             <div className="grid grid-cols-[minmax(0,1fr)_68px_68px] items-center border-b border-[var(--consumer-border)] bg-[var(--consumer-canvas)] px-3 py-2 text-[0.67rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:grid-cols-[minmax(0,1fr)_88px_88px] sm:px-4">
               <span>Event</span>
               <span className="flex items-center justify-center gap-1"><Monitor aria-hidden className="size-3.5" /> In-app</span>
-              <span className="flex items-center justify-center gap-1"><Mail aria-hidden className="size-3.5" /> Email unavailable</span>
+              <span className="flex items-center justify-center gap-1"><Mail aria-hidden className="size-3.5" /> Email</span>
             </div>
             {preferences.map((preference) => {
               const meta = TYPE_META[preference.eventType];
@@ -196,7 +197,9 @@ export function ConsumerNotificationPreferences({
                   <ChannelSwitch
                     checked={preference.email}
                     disabled={saving !== null || !CONSUMER_NOTIFICATION_EMAIL_AVAILABLE}
-                    label={`${meta.label}, email unavailable`}
+                    // The constant stays in the condition: it is the one switch that turns consumer
+                    // event email off everywhere if the dispatcher has to be pulled.
+                    label={`${meta.label}, email ${preference.email ? "on" : "off"}`}
                     onChange={() => void change(preference, "email")}
                   />
                 </div>

@@ -12,11 +12,33 @@ export const CONSUMER_NOTIFICATION_EVENT_TYPES = [
 ] as const satisfies readonly NotificationEventType[];
 
 /**
- * Consumer event emails do not have a production dispatcher yet. Keep this false until a
- * provider-backed consumer outbox exists; operator billing and requested password-reset emails
- * are separate transactional paths and are intentionally outside these preferences.
+ * Consumer event email is dispatched by `email-dispatch.ts`, which hangs off the same in-app
+ * notification the feed shows and sends through the configured email driver. Operator billing and
+ * requested password-reset emails remain separate transactional paths, outside these preferences.
  */
-export const CONSUMER_NOTIFICATION_EMAIL_AVAILABLE = false as const;
+export const CONSUMER_NOTIFICATION_EMAIL_AVAILABLE = true as const;
+
+/**
+ * Which categories are emailed unless the consumer says otherwise.
+ *
+ * On for the two a person would want to hear about while away from the app: a credit alert, and a
+ * message from their team that is waiting on a reply. Off for everything the app surfaces on its
+ * own schedule — stage moves, plans, refreshes, onboarding steps, documents and application
+ * updates — because those arrive often enough that emailing them all trains people to ignore the
+ * sender. The database seed in migration 434 writes these same values.
+ */
+export const CONSUMER_NOTIFICATION_EMAIL_DEFAULTS: Readonly<
+  Record<NotificationEventType, boolean>
+> = Object.freeze({
+  monitoring_alert: true,
+  stage_change: false,
+  analysis_complete: false,
+  refresh_result: false,
+  enrollment_milestone: false,
+  document: false,
+  team_message: true,
+  application_update: false,
+});
 
 export interface ConsumerNotificationPreference {
   readonly email: boolean;
@@ -29,7 +51,11 @@ export type ConsumerNotificationPreferences = readonly ConsumerNotificationPrefe
 export const DEFAULT_CONSUMER_NOTIFICATION_PREFERENCES: ConsumerNotificationPreferences =
   Object.freeze(
     CONSUMER_NOTIFICATION_EVENT_TYPES.map((eventType) =>
-      Object.freeze({ email: false, eventType, inApp: true }),
+      Object.freeze({
+        email: CONSUMER_NOTIFICATION_EMAIL_DEFAULTS[eventType],
+        eventType,
+        inApp: true,
+      }),
     ),
   );
 
@@ -77,7 +103,11 @@ export function completeConsumerNotificationPreferences(
       const saved = byType.get(eventType);
       return saved
         ? Object.freeze({ ...saved })
-        : Object.freeze({ email: false, eventType, inApp: true });
+        : Object.freeze({
+          email: CONSUMER_NOTIFICATION_EMAIL_DEFAULTS[eventType],
+          eventType,
+          inApp: true,
+        });
     }),
   );
 }
