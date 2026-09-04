@@ -28,10 +28,11 @@ function setCookies(headers: Headers): string {
 }
 
 async function signIn(email: string, password: string): Promise<string> {
-  const response = await fetch(`${baseUrl}/api/auth/sign-in`, {
+  const signInUrl = new URL("/api/auth/sign-in", baseUrl);
+  const response = await fetch(signInUrl, {
     method: "POST",
     redirect: "manual",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", origin: signInUrl.origin },
     body: JSON.stringify({ email, password }),
   });
   assert.ok([200, 302, 303, 307].includes(response.status), `sign-in for ${email} returned ${response.status}`);
@@ -44,12 +45,15 @@ async function request(
   path: string,
   options: { body?: unknown; cookie?: string; method?: string } = {},
 ): Promise<{ body: Record<string, unknown>; response: Response }> {
-  const response = await fetch(`${baseUrl}${path}`, {
-    method: options.method ?? "GET",
+  const method = options.method ?? "GET";
+  const target = new URL(path, baseUrl);
+  const response = await fetch(target, {
+    method,
     redirect: "manual",
     headers: {
       ...(options.body === undefined ? {} : { "content-type": "application/json" }),
       ...(options.cookie ? { cookie: options.cookie } : {}),
+      ...(!["GET", "HEAD"].includes(method) ? { origin: target.origin } : {}),
     },
     ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
   });

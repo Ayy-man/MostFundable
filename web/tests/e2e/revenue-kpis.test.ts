@@ -80,9 +80,10 @@ function cleanup(): void {
 }
 
 async function signIn(baseUrl: string, email: string, password: string): Promise<string> {
-  const response = await fetch(`${baseUrl}/api/auth/sign-in`, {
+  const signInUrl = new URL("/api/auth/sign-in", baseUrl);
+  const response = await fetch(signInUrl, {
     body: JSON.stringify({ email, password }),
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", origin: signInUrl.origin },
     method: "POST",
     redirect: "manual",
   });
@@ -97,11 +98,13 @@ async function api(
   path: string,
   input: { body?: unknown; cookie?: string; method?: "GET" | "POST" } = {},
 ): Promise<{ body: Record<string, unknown>; status: number }> {
-  const response = await fetch(`${baseUrl}${path}`, {
+  const target = new URL(path, baseUrl);
+  const response = await fetch(target, {
     body: input.body === undefined ? undefined : JSON.stringify(input.body),
     headers: {
       ...(input.cookie ? { cookie: input.cookie } : {}),
       ...(input.body === undefined ? {} : { "content-type": "application/json" }),
+      ...(input.method === "POST" ? { origin: target.origin } : {}),
     },
     method: input.method ?? "GET",
     redirect: "manual",
@@ -129,12 +132,18 @@ describe("revenue KPIs over a live local server", { skip }, () => {
       assert.equal(disabled.status, 404);
       const offFixture = deriveSaasMetrics();
       assert.equal(selectRevenueMetrics(offFixture, null), offFixture);
-      assert.deepEqual(revenuePresentation(null), {
-        complete: true,
-        enabled: false,
-        monitoringLabel: "Monitoring profit",
-        referralLabel: "Referral split",
-      });
+      const disabledPresentation = revenuePresentation(null);
+      const failedPresentation = revenuePresentation("failed");
+      assert.deepEqual(
+        Object.keys(disabledPresentation).sort(),
+        Object.keys(failedPresentation).sort(),
+        "disabled and failed revenue reads no longer share one presentation contract",
+      );
+      assert.equal(disabledPresentation.enabled, false);
+      assert.equal(disabledPresentation.failed, false);
+      assert.equal(failedPresentation.failed, true);
+      assert.equal(disabledPresentation.monitoringLabel, failedPresentation.monitoringLabel);
+      assert.equal(disabledPresentation.referralLabel, failedPresentation.referralLabel);
       stopChild(pid, port);
       pid = null;
       port = null;

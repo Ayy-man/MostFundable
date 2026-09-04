@@ -183,9 +183,14 @@ describe("Phase 20 tenancy over live local HTTP", { skip }, () => {
   }
 
   async function signIn(baseUrl: string, host: string, email: string): Promise<string> {
-    const response = await fetch(hostUrl(baseUrl, host, "/api/auth/sign-in"), {
+    const signInUrl = new URL(hostUrl(baseUrl, host, "/api/auth/sign-in"));
+    const response = await fetch(signInUrl, {
       body: JSON.stringify({ email, password }),
-      headers: { "content-type": "application/json", "x-forwarded-host": host },
+      headers: {
+        "content-type": "application/json",
+        origin: signInUrl.origin,
+        "x-forwarded-host": host,
+      },
       method: "POST",
       redirect: "manual",
     });
@@ -208,10 +213,14 @@ describe("Phase 20 tenancy over live local HTTP", { skip }, () => {
     method?: string;
     path: string;
   }): Promise<Response> {
-    return fetch(hostUrl(input.baseUrl ?? defaultBase, input.host, input.path), {
+    const target = new URL(hostUrl(input.baseUrl ?? defaultBase, input.host, input.path));
+    return fetch(target, {
       body: input.body,
       headers: {
         ...(input.cookie ? { cookie: input.cookie } : {}),
+        ...(input.method && !["GET", "HEAD"].includes(input.method)
+          ? { origin: target.origin }
+          : {}),
         "x-forwarded-host": input.host,
         ...input.headers,
       },

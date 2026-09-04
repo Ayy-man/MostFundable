@@ -306,7 +306,10 @@ describe("operator dunning over HTTP, with no Stripe key", { skip }, () => {
     route: string,
   ): Promise<{ payload: unknown; status: number }> {
     const response = await fetch(`${baseUrl}${route}`, {
-      headers: { cookie },
+      headers: {
+        cookie,
+        ...(method === "POST" ? { origin: new URL(baseUrl).origin } : {}),
+      },
       method,
     });
     const raw = await response.text();
@@ -397,9 +400,13 @@ describe("operator dunning over HTTP, with no Stripe key", { skip }, () => {
 
     // The application's own sign-in route, so the session cookie is minted the
     // way production mints it rather than assembled by hand here.
-    const signIn = await fetch(`${baseUrl}/api/auth/sign-in`, {
+    const signInUrl = new URL("/api/auth/sign-in", baseUrl);
+    const signIn = await fetch(signInUrl, {
       body: JSON.stringify({ email: ownerEmail(), password }),
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        origin: signInUrl.origin,
+      },
       method: "POST",
       redirect: "manual",
     });

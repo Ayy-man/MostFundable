@@ -109,10 +109,11 @@ const skip = !serverUp
 /** Sign in over the app's own route so @supabase/ssr writes the session cookie
  * through its adapter; forging that cookie here would test our forgery. */
 async function signIn(email: string, password: string): Promise<string> {
-  const response = await fetch(`${baseUrl}/api/auth/sign-in`, {
+  const signInUrl = new URL("/api/auth/sign-in", baseUrl);
+  const response = await fetch(signInUrl, {
     method: "POST",
     redirect: "manual",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", origin: signInUrl.origin },
     body: JSON.stringify({ email, password }),
   });
   assert.ok(
@@ -134,10 +135,15 @@ async function call(
   method: string,
   body: unknown,
 ): Promise<{ status: number; payload: Record<string, unknown> }> {
-  const response = await fetch(`${baseUrl}${path}`, {
+  const target = new URL(path, baseUrl);
+  const response = await fetch(target, {
     method,
     redirect: "manual",
-    headers: { "content-type": "application/json", cookie },
+    headers: {
+      "content-type": "application/json",
+      cookie,
+      ...(!["GET", "HEAD"].includes(method) ? { origin: target.origin } : {}),
+    },
     body: JSON.stringify(body),
   });
   const text = await response.text();
