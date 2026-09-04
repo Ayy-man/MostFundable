@@ -9293,7 +9293,7 @@ export function OperatorSurface({
           onOpenClient={openClient}
           teamMembers={teamRows}
           teamSeesAllClients={teamSeesAllClients}
-          timelineEnabled={false}
+          timelineEnabled={timelineEnabled}
           workspaceBrandName={workspaceBrandName}
         />
       );
