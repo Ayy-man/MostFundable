@@ -39,6 +39,8 @@ export function ResetPasswordForm() {
         setError(message);
         return;
       }
+      // The completed auth mutation needs a full document navigation so server session state reloads.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.assign("/");
     } catch {
       setError("The password could not be updated. Try again.");

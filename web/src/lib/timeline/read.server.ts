@@ -488,12 +488,15 @@ function projectEvent(event: TimelineEvent, audience: TimelineAudience): Timelin
   if (event.operatorOnly) return null;
   if (event.kind === "application_outcome" && event.releasedOn === undefined) return null;
   const { client: _client, ...withoutClient } = event;
+  void _client;
   if (withoutClient.kind === "thread_status") {
     const { actor: _actor, ...withoutActor } = withoutClient;
+    void _actor;
     return withoutActor;
   }
   if (withoutClient.kind === "fee_payment") {
     const { balanceCents: _balance, ...withoutBalance } = withoutClient;
+    void _balance;
     return withoutBalance;
   }
   return withoutClient;

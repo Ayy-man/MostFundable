@@ -3937,6 +3937,8 @@ function SettingsView({
         notify(message);
         return;
       }
+      // The validated destination belongs to the hosted billing provider, not the Next.js router.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.assign(hostedUrl);
     } catch {
       const message = "The secure billing portal could not be opened right now. Nothing was changed.";
