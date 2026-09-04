@@ -198,6 +198,17 @@ jobs:
           export AUTH_DEV_AFFILIATE_PASSWORD="$local_seed_password"
           export FEES_E2E_OWNER_PASSWORD="$local_seed_password"
           export FEES_E2E_ADMIN_PASSWORD="$local_seed_password"
+          node - <<'NODE'
+          const target = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/health`;
+          for (let attempt = 0; attempt < 120; attempt += 1) {
+            try {
+              const response = await fetch(target);
+              if (response.ok) process.exit(0);
+            } catch {}
+            await new Promise((resolve) => setTimeout(resolve, 250));
+          }
+          throw new Error(`local Auth service did not become ready at ${target}`);
+          NODE
           npm start -- -H 127.0.0.1 -p 3005 > "$RUNNER_TEMP/mostfundable-auth-server.log" 2>&1 &
           server_pid=$!
           cleanup() {
@@ -216,7 +227,12 @@ jobs:
           }
           throw new Error(`local authenticated E2E server did not become ready at ${target}`);
           NODE
-          node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/ts-resolve-hook.mjs --test --test-concurrency=1 --test-reporter=tap tests/e2e/affiliates.test.ts tests/e2e/fees-legal-gate.test.ts
+          status=0
+          node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/ts-resolve-hook.mjs --test --test-concurrency=1 --test-reporter=tap tests/e2e/affiliates.test.ts tests/e2e/fees-legal-gate.test.ts || status=$?
+          if [ "$status" -ne 0 ]; then
+            tail -250 "$RUNNER_TEMP/mostfundable-auth-server.log" || true
+          fi
+          exit "$status"
 
       - name: Mock paid-refresh end-to-end test
         working-directory: web
