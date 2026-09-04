@@ -46,9 +46,6 @@ jobs:
       - name: Hardening tests
         run: npm run test:hardening
 
-      - name: End-to-end tests
-        run: npm run test:e2e
-
       - name: Compliance copy scanner
         run: node scripts/verify-compliance-copy.mjs --self-test && node scripts/verify-compliance-copy.mjs
 
@@ -83,6 +80,18 @@ jobs:
       - name: Install application dependencies
         working-directory: web
         run: npm ci
+
+      - name: Build application for local end-to-end tests
+        working-directory: web
+        run: npm run build
+
+      - name: End-to-end tests against the local stack
+        working-directory: web
+        env:
+          ADMIN_E2E: "1"
+          MF_TENANCY_MAIL_E2E: "1"
+          REVENUE_E2E: "1"
+        run: npm run test:e2e
 
       - name: Source and product gates
         working-directory: web
