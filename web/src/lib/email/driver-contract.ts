@@ -23,16 +23,28 @@ export type EmailContractDriverFactory = (
 ) => EmailDriver;
 
 function supportedRequest(): EmailSendInput<"operator_card_failure"> {
-  const published = Object.values(EMAIL_TEMPLATE_REGISTRY).filter(
-    (definition) => definition.providerTemplate !== null,
-  );
-  assert.equal(
-    published.length,
-    1,
+  const published = Object.values(EMAIL_TEMPLATE_REGISTRY)
+    .filter((definition) => definition.providerTemplate !== null)
+    .map((definition) => definition.template)
+    .sort();
+  assert.deepEqual(
+    published,
+    [
+      "consumer_analysis_complete",
+      "consumer_application_update",
+      "consumer_document",
+      "consumer_enrollment_milestone",
+      "consumer_monitoring_alert",
+      "consumer_refresh_result",
+      "consumer_stage_change",
+      "consumer_team_message",
+      "operator_card_failure",
+    ],
     "the email catalog changed its published-template set without updating the driver contract",
   );
-  const [definition] = published;
-  assert.equal(definition.template, "operator_card_failure");
+  // Every driver must carry the operator template; consumer templates only reach the resend
+  // driver, which the consumer dispatcher gates on, so the shared contract stays on this one.
+  const definition = EMAIL_TEMPLATE_REGISTRY.operator_card_failure;
   assert.deepEqual(definition.internalKeys, ["DELIVERY_REFERENCE"]);
   return {
     orgId: ORG_ID,

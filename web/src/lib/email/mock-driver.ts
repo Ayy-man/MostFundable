@@ -1,6 +1,6 @@
 import { buildProviderVariables, validateTemplateVariables } from "./templates.ts";
 import type { EmailReceiptRepository } from "./repository.ts";
-import type { EmailDriver, EmailSendInput, EmailSendReceipt } from "./types.ts";
+import type { EmailDriver, EmailSendInput, EmailSendReceipt, EmailTemplate } from "./types.ts";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAILBOX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -17,7 +17,9 @@ export function createMockEmailDriver(input: {
   readonly repository: EmailReceiptRepository;
 }): EmailDriver {
   return {
-    async send<T extends "operator_card_failure" | "crs_alert">(
+    // The mock driver stays deliberately narrow: it is what an unconfigured deployment gets, and
+    // the consumer dispatcher no-ops before reaching a driver when EMAIL_DRIVER is unset or mock.
+    async send<T extends EmailTemplate>(
       request: EmailSendInput<T>,
     ): Promise<EmailSendReceipt> {
       if (!UUID.test(request.orgId) || request.template !== "operator_card_failure") {

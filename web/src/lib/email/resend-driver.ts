@@ -1,6 +1,12 @@
-import { buildProviderVariables, validateTemplateVariables } from "./templates.ts";
-import type { EmailReceiptRepository } from "./repository.ts";
-import type { EmailDriver, EmailSendInput, EmailSendReceipt } from "./types.ts";
+import {
+  EMAIL_TEMPLATE_REGISTRY,
+  buildProviderVariables,
+  deliveryReference,
+  validateTemplateVariables,
+} from "./templates.ts";
+import { isPublishedEmailTemplate } from "./repository.ts";
+import type { EmailReceiptRepository, PublishedEmailTemplate } from "./repository.ts";
+import type { EmailDriver, EmailSendInput, EmailSendReceipt, EmailTemplate } from "./types.ts";
 
 export const RESEND_EMAIL_URL = "https://api.resend.com/emails";
 const RESPONSE_LIMIT_BYTES = 64 * 1024;
@@ -126,14 +132,25 @@ export function createResendEmailDriver(options: ResendEmailDriverOptions): Emai
   const cancel = options.clearTimer ?? clearTimeout;
 
   return {
-    async send<T extends "operator_card_failure" | "crs_alert">(
+    async send<T extends EmailTemplate>(
       input: EmailSendInput<T>,
     ): Promise<EmailSendReceipt> {
-      if (!UUID.test(input.orgId) || input.template !== "operator_card_failure") {
+      if (!UUID.test(input.orgId) || !isPublishedEmailTemplate(input.template)) {
         throw new ResendEmailError("RESEND_INPUT_INVALID");
       }
-      const variables = validateTemplateVariables("operator_card_failure", input.vars);
-      const providerVariables = buildProviderVariables("operator_card_failure", variables);
+      const template: PublishedEmailTemplate = input.template;
+      const providerTemplate = EMAIL_TEMPLATE_REGISTRY[template].providerTemplate;
+      if (providerTemplate === null) throw new ResendEmailError("RESEND_INPUT_INVALID");
+      let variables;
+      let providerVariables;
+      let delivery;
+      try {
+        variables = validateTemplateVariables(template, input.vars);
+        providerVariables = buildProviderVariables(template, variables);
+        delivery = deliveryReference(template, variables);
+      } catch {
+        throw new ResendEmailError("RESEND_INPUT_INVALID");
+      }
       const recipient = mailbox(input.to);
       const sender = await options.resolveOrgDisplayName(input.orgId).then(
         (value) => ({ ok: true as const, value: displayName(value) }),
@@ -141,8 +158,8 @@ export function createResendEmailDriver(options: ResendEmailDriverOptions): Emai
       );
       if (!sender.ok && sender.error instanceof ResendEmailError) throw sender.error;
       const claimed = await options.repository.claim({
-        deliveryId: variables.DELIVERY_REFERENCE,
-        template: "operator_card_failure",
+        deliveryId: delivery,
+        template,
         recipient,
       });
       if (claimed.status === "accepted" && claimed.providerRef !== null) {
@@ -171,7 +188,7 @@ export function createResendEmailDriver(options: ResendEmailDriverOptions): Emai
             from: `${senderName} <${fromMailbox}>`,
             to: [recipient],
             template: {
-              id: "operator-card-failure",
+              id: providerTemplate,
               variables: providerVariables,
             },
           }),
