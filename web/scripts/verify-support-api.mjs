@@ -337,6 +337,9 @@ async function startServer(flagOn) {
   // unset, so deleting these handed the arm's setup to whatever the developer happens to have on.
   env.FEATURE_SUPPORT = "0";
   env.FEATURE_REAL_AUTH = "0";
+  // Support drafts read their own selector now; AI_DRIVER is pinned alongside it only so a
+  // developer's `.env.local` cannot reach the deprecated fallback and log a warning here.
+  env.SUPPORT_DRAFT_DRIVER = "mock";
   env.AI_DRIVER = "mock";
   if (flagOn) env.FEATURE_SUPPORT = "1";
 

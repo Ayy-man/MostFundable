@@ -19,10 +19,10 @@ import 'server-only';
 // the compliance and citation scans. A candidate the scans reject produces no
 // `reviewing` line at all, which is truthful — the supervisor was never asked.
 
-import { resolveDriver } from '../env.ts';
 import { createZdrChatTransport } from '../llm/chat-transport.ts';
 import { createMockChatTransport } from '../llm/mock-chat-transport.ts';
 import { encodeAnswerBody } from '../kb/answer-body.ts';
+import { resolveAssistantDriver } from '../kb/driver.ts';
 import { resolveKbModel, resolveKbProviderSort, resolveKbReasoning } from '../kb/model.ts';
 import { assistantMockResponder } from './mock-responder.ts';
 import { answerAssistantQuestion } from './orchestrator.ts';
@@ -62,7 +62,7 @@ export interface AssistantAnswerDependencies {
 }
 
 function productionTransport(): ChatTransport {
-  return resolveDriver('ai') === 'mock'
+  return resolveAssistantDriver() === 'mock'
     ? createMockChatTransport(assistantMockResponder)
     : createZdrChatTransport({ apiKey: process.env.OPENROUTER_API_KEY, model: resolveKbModel(), reasoning: resolveKbReasoning(), providerSort: resolveKbProviderSort() });
 }

@@ -11,7 +11,14 @@ const DRIVER_VALUES = Object.freeze({
   CRS_DRIVER: new Set(["mock", "sandbox"]),
   BILLING_DRIVER: new Set(["mock", "stripe"]),
   IDV_DRIVER: new Set(["mock"]),
+  // AI_DRIVER is deprecated in favour of the three per-service keys beside it,
+  // and stays legal in a ledger row only while a rehearsal recorded under it
+  // still has to parse.
   AI_DRIVER: new Set(["mock", "openrouter"]),
+  ASSISTANT_DRIVER: new Set(["mock", "openrouter"]),
+  SUPPORT_DRAFT_DRIVER: new Set(["mock", "openrouter"]),
+  EVAL_DRIVER: new Set(["mock", "openrouter"]),
+  PLAN_DRIVER: new Set(["mock", "openrouter"]),
   VAULT_DRIVER: new Set(["fixture", "supabase"]),
   CREDIT_REPORT_PARSER_DRIVER: new Set(["fixture", "unavailable"]),
   EMAIL_DRIVER: new Set(["mock", "resend"]),

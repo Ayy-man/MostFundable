@@ -292,6 +292,57 @@ export function resolveDriverFromSpec<S extends DriverSpec>(
 }
 
 /**
+ * Selectors that have already announced their deprecated fallback.
+ *
+ * A `Set` literal is not a side effect: nothing is read, nothing is thrown, and
+ * an import of this module still does no work. It is keyed by the *new*
+ * selector so a deployment running on the old key hears about each service once
+ * per process rather than once per request.
+ */
+const warnedDeprecatedSelectors = new Set<string>();
+
+/**
+ * Resolve a service's own selector, accepting a deprecated one for a release.
+ *
+ * Splitting a shared `*_DRIVER` key into per-service keys is the fix for the
+ * defect `llm/driver.ts` describes at length: one key that reconfigures three
+ * services means flipping one of them silently flips the other two. But a split
+ * that takes effect the moment it deploys would move every service that was
+ * running on the old key back to its fallback, which is a behaviour change
+ * nobody asked for in a release that was meant to be a rename.
+ *
+ * So the rule is: the service's own key wins whenever it is set; a blank one
+ * falls through to the deprecated key, with one warning naming the key the
+ * operator should move to; and with neither set the table fallback applies as
+ * usual. The deprecated key's value is resolved against the *new* spec, so the
+ * legal values, the required keys and the error messages are the service's own
+ * — the old key supplies a value, not a second set of rules.
+ *
+ * Remove the deprecated argument one release after the new keys are set.
+ */
+export function resolveDriverFromSpecWithDeprecatedSelector<S extends DriverSpec>(
+  service: string,
+  spec: S,
+  deprecatedSelector: string,
+  env: EnvSource = process.env,
+  warn: (message: string) => void = (message) => console.warn(message),
+): S["values"][number] {
+  if (isBlank(env[spec.selector]) && !isBlank(env[deprecatedSelector])) {
+    if (!warnedDeprecatedSelectors.has(spec.selector)) {
+      warnedDeprecatedSelectors.add(spec.selector);
+      warn(
+        `${deprecatedSelector} is deprecated for the ${service} driver and is being ` +
+          `read as a fallback. Set ${spec.selector} instead; ${deprecatedSelector} ` +
+          `stops being consulted after the next release.`,
+      );
+    }
+    return resolveDriverFromSpec(service, { ...spec, selector: deprecatedSelector }, env);
+  }
+
+  return resolveDriverFromSpec(service, spec, env);
+}
+
+/**
  * The feature flags from BACKEND-SPEC §10 and INTERFACES §6, unprefixed
  * exactly as both documents write them, so five lanes read one set of names.
  *

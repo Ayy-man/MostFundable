@@ -765,9 +765,19 @@ const REQUIRED_BASE_KEYS = [
   // 41236de bumped EXPECTED_KEY_COUNT 70→72 for the quick-sign-in pair but only
   // added the flag; the password name was the missing 72nd entry all along.
   "DEMO_QUICK_SIGN_IN_PASSWORD",
+  // The per-service AI selectors. They are deliberately NOT rows in the frozen
+  // §10 DRIVERS table — each one is declared next to the service that reads it
+  // and resolved through `resolveDriverFromSpec` — but an operator still has to
+  // find them, and `.env.example` is where they look. They are required here as
+  // names for that reason, and because the whole point of splitting them off
+  // `AI_DRIVER` is that a reader can see which service each one moves.
+  "PLAN_DRIVER",
+  "ASSISTANT_DRIVER",
+  "SUPPORT_DRAFT_DRIVER",
+  "EVAL_DRIVER",
 ];
 
-const EXPECTED_KEY_COUNT = 72;
+const EXPECTED_KEY_COUNT = 76;
 
 // Used by plan 00-03, which is what rewrites `.env.example`. Running it before
 // then reports the file as it stands today, which is one line with a value on
