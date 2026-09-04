@@ -20,12 +20,18 @@ const playedOnce = new Set<string>();
 export type JourneyStage = "onboarding" | "optimization" | "ready" | "applying" | "funded" | "graduate";
 export type JourneyStatus = "complete" | "active" | "locked";
 
+/*
+ * Every colour below is a surface token rather than the handoff's hex so the
+ * rail sits on the same green as the rest of the Overview: `--consumer-positive`
+ * for a completed node, the accent ink and tint for the current one, and the
+ * canvas hairline for a locked one. The halo is the positive green at reduced
+ * alpha; Electric Green stays reserved for text on dark grounds.
+ */
 const NODE_STYLES: Record<JourneyStatus, string> = {
-  complete: "bg-[#15803d] shadow-[0_3px_10px_rgba(21,128,61,.28)]",
-  active: "border-[1.5px] border-[#22c55e] bg-[#ecfdf5]",
-  locked: "border border-[#e5e7eb] bg-white",
+  complete: "bg-[var(--consumer-positive)] shadow-[0_3px_10px_color-mix(in_srgb,var(--consumer-positive),transparent_72%)]",
+  active: "border-[1.5px] border-[var(--consumer-accent-ink)] bg-[var(--consumer-accent-tint)]",
+  locked: "border border-[var(--consumer-border)] bg-card",
 };
-
 
 type Palette = {
   ink: string; // primary stroke
@@ -39,37 +45,38 @@ type Palette = {
 
 const PALETTES: Record<JourneyStatus, Palette> = {
   complete: {
-    ink: "#fff",
-    accent: "#4ade80",
-    accentInk: "#0b3b2e",
-    faint: "rgba(255,255,255,.45)",
-    fainter: "rgba(255,255,255,.28)",
-    ringFill: "rgba(255,255,255,.18)",
-    tipFill: "#fff",
+    ink: "var(--card)",
+    accent: "var(--consumer-accent)",
+    accentInk: "var(--consumer-positive)",
+    faint: "color-mix(in srgb, var(--card), transparent 55%)",
+    fainter: "color-mix(in srgb, var(--card), transparent 72%)",
+    ringFill: "color-mix(in srgb, var(--card), transparent 82%)",
+    tipFill: "var(--card)",
   },
   active: {
-    ink: "#15803d",
-    accent: "#4ade80",
-    accentInk: "#0b3b2e",
-    faint: "#bbf7d0",
-    fainter: "#86efac",
-    ringFill: "rgba(21,128,61,.18)",
-    tipFill: "#0b3b2e",
+    ink: "var(--consumer-accent-ink)",
+    accent: "var(--consumer-accent-ink)",
+    accentInk: "var(--card)",
+    faint: "color-mix(in srgb, var(--consumer-accent-ink), transparent 72%)",
+    fainter: "color-mix(in srgb, var(--consumer-accent-ink), transparent 60%)",
+    ringFill: "color-mix(in srgb, var(--consumer-accent-ink), transparent 82%)",
+    tipFill: "var(--consumer-hero-ink)",
   },
   locked: {
-    ink: "#9ca3af",
-    accent: "#9ca3af",
-    accentInk: "#fff",
-    faint: "#d1d5db",
-    fainter: "#e5e7eb",
-    ringFill: "#e5e7eb",
-    tipFill: "#9ca3af",
+    ink: "var(--muted-foreground)",
+    accent: "var(--muted-foreground)",
+    accentInk: "var(--card)",
+    faint: "var(--consumer-border)",
+    fainter: "color-mix(in srgb, var(--consumer-border), transparent 40%)",
+    ringFill: "var(--consumer-canvas)",
+    tipFill: "var(--muted-foreground)",
   },
 };
 
-function StageGlyph({ stage, status }: { stage: JourneyStage; status: JourneyStatus }) {
+/** The bare glyph for a stage, in the palette of its status. `still` draws it with no motion classes. */
+export function StageGlyph({ stage, status, still = false }: { stage: JourneyStage; status: JourneyStatus; still?: boolean }) {
   const p = PALETTES[status];
-  const animate = status !== "locked";
+  const animate = status !== "locked" && !still;
   const a = (name: string) => (animate ? `mf-journey-${name}` : undefined);
 
   switch (stage) {
@@ -160,8 +167,7 @@ export function JourneyStepIcon({
   stage: JourneyStage;
   status: JourneyStatus;
 }) {
-  // Locked Ready keeps a slightly darker stroke so the empty gate ring stays legible.
-  const stroke = status === "locked" && stage === "ready" ? "#6b7280" : PALETTES[status].ink;
+  const stroke = PALETTES[status].ink;
   const onceKey = `node:${stage}`;
   const once = status === "complete" ? (playedOnce.has(onceKey) ? "done" : "play") : undefined;
   return (
@@ -173,7 +179,7 @@ export function JourneyStepIcon({
       data-status={status}
       onAnimationEnd={once === "play" ? () => playedOnce.add(onceKey) : undefined}
     >
-      {status === "active" ? <span className="mf-journey-halo absolute inset-0 box-border rounded-full bg-[#4ade80]" /> : null}
+      {status === "active" ? <span className="mf-journey-halo absolute inset-0 box-border rounded-full bg-[color-mix(in_srgb,var(--consumer-positive),transparent_35%)]" /> : null}
       <span className={cn("absolute inset-0 box-border flex items-center justify-center rounded-full", NODE_STYLES[status])}>
         <svg
           fill="none"
@@ -211,5 +217,37 @@ export function JourneyConnector({ flowing, reducedMotion = false, stage }: { fl
 
 /* The 6px breathing dot inside the Active chip. */
 export function JourneyActiveDot({ reducedMotion = false }: { reducedMotion?: boolean }) {
-  return <span aria-hidden className="mf-journey-breathe size-1.5 shrink-0 rounded-full bg-[#22c55e]" data-motion={reducedMotion ? "off" : undefined} />;
+  return <span aria-hidden className="mf-journey-breathe size-1.5 shrink-0 rounded-full bg-[var(--consumer-accent-ink)]" data-motion={reducedMotion ? "off" : undefined} />;
+}
+
+/*
+ * A compact, still stage mark for dense rows: the affiliate lead track, the
+ * operator client list. 20px, no halo, no motion of its own; a caller that
+ * wants a pop on change wraps it with `data-mark-pop`.
+ */
+export function JourneyStageMark({ stage, tone }: { stage: JourneyStage; tone: "past" | "current" | "upcoming" }) {
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        "grid size-5 shrink-0 place-items-center rounded-full transition-[background-color,border-color] duration-[var(--duration-very-slow)] ease-[var(--ease-smooth-out)] motion-reduce:transition-none",
+        tone === "past" && "bg-[color-mix(in_srgb,var(--consumer-positive),transparent_86%)] border border-[color-mix(in_srgb,var(--consumer-positive),transparent_60%)]",
+        tone === "current" && "bg-[var(--consumer-positive)] border border-[var(--consumer-positive)]",
+        tone === "upcoming" && "border border-[var(--consumer-border)] bg-card",
+      )}
+    >
+      <svg
+        fill="none"
+        height={12}
+        stroke={tone === "past" ? "var(--consumer-positive)" : tone === "current" ? "var(--card)" : "var(--muted-foreground)"}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={1.9}
+        viewBox="0 0 24 24"
+        width={12}
+      >
+        <StageGlyph stage={stage} status={tone === "current" ? "complete" : tone === "past" ? "active" : "locked"} still />
+      </svg>
+    </span>
+  );
 }

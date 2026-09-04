@@ -40,6 +40,7 @@ import {
   ShieldCheck,
   Upload,
   WalletCards,
+  Check,
 } from "lucide-react";
 
 import {
@@ -52,6 +53,8 @@ import {
   WorkspaceSection,
 } from "@/components/consumer/consumer-kit";
 import { JourneyActiveDot, JourneyConnector, JourneyStepIcon, type JourneyStage } from "@/components/consumer/journey-step-icon";
+import { ReadinessRing } from "@/components/consumer/readiness-ring";
+import { useCountUp, usePrevious } from "@/lib/motion/hooks";
 import { DurableOptimizationView } from "@/components/consumer/optimization-view";
 import {
   ConsumerTrainingsView,
@@ -445,6 +448,8 @@ const onboardingMilestones: ReadonlyArray<{
 ];
 
 type OverviewMetric = {
+  /** The raw amount behind a money figure, so the cell can count it rather than swap it. */
+  amountCents?: number | null;
   detail: string;
   label: string;
   value: string;
@@ -480,6 +485,7 @@ function buildOverviewMetricRows(input: OverviewMetricInput): {
         value: formatFundingApproved(null),
       }
     : {
+        amountCents: input.fundingApprovedCents,
         detail: "Recorded historical outcome",
         label: "Funding approved",
         value: formatFundingApproved(input.fundingApprovedCents),
@@ -502,6 +508,13 @@ function OverviewMetricCell({
 }) {
   const monitoring = metric.label === "Monitoring";
   const monitoringActive = monitoring && !/(inactive|paused|revoked|unavailable|not authorized)/i.test(metric.value);
+  // A money figure counts to its value and ticks when a recorded outcome moves it. Every other
+  // metric is a label or a date and simply reads its string.
+  const amountCents = metric.amountCents ?? null;
+  const shownCents = useCountUp(amountCents, 900);
+  const previousCents = usePrevious(amountCents);
+  const amountTicked = previousCents !== undefined && previousCents !== null && previousCents !== amountCents;
+  const shownValue = amountCents !== null && shownCents !== null ? formatFundingApproved(shownCents) : metric.value;
 
   return (
     <div
@@ -525,8 +538,8 @@ function OverviewMetricCell({
       ) : null}
       <div className="min-w-0">
         {monitoring ? null : <p className="text-xs text-muted-foreground">{metric.label}</p>}
-        <p className={cn("font-semibold tabular-nums", monitoring ? "text-sm" : "mt-2 text-lg")}>
-          {monitoring ? `Monitoring ${monitoringActive ? "active" : metric.value.toLowerCase()}` : metric.value}
+        <p className={cn("font-semibold tabular-nums", monitoring ? "text-sm" : "mt-2 text-lg")} data-count-tick={amountTicked ? "" : undefined} key={amountTicked ? amountCents ?? 0 : "rest"}>
+          {monitoring ? `Monitoring ${monitoringActive ? "active" : metric.value.toLowerCase()}` : shownValue}
         </p>
         <p className="mt-1 text-[0.68rem] text-muted-foreground">{metric.detail}</p>
       </div>
@@ -944,20 +957,22 @@ function DurableReadinessPanel({ client, formatDate }: { client: TrackerClient; 
           <p className="text-right text-xs text-[var(--consumer-muted)] tabular-nums">Snapshot · {formatDate(client.analysisAt)}</p>
         ) : null}
       </div>
-      <div className="mt-4 flex flex-1 flex-col items-start justify-center border-y border-[var(--consumer-border)] py-6">
-        <FadeSwap as="div" id={verified ? "verified" : "pending"}>
-        {verified ? (
-          <p className="text-[3.25rem] font-semibold leading-none tracking-[-0.04em] tabular-nums">
-            {client.readiness}
-            <span className="ml-2 text-base font-medium text-[var(--consumer-muted)]">/ 100</span>
+      <div className="mt-4 flex flex-1 items-center gap-5 border-y border-[var(--consumer-border)] py-5">
+        {/* The ring reads client.readiness and, while an authorized analysis is still running,
+            client.analysisPending: it sweeps with no digits until the verified figure lands. */}
+        <ReadinessRing inFlight={!verified && client.analysisPending !== null} value={client.readiness} />
+        <div className="min-w-0">
+          <FadeSwap as="div" className="text-sm font-semibold" id={verified ? "verified" : client.analysisPending !== null ? "running" : "pending"}>
+            {verified ? "Verified from the latest completed analysis" : client.analysisPending !== null ? "Analysis running" : "Not yet verified"}
+          </FadeSwap>
+          <p className="mt-1.5 max-w-[30ch] text-xs leading-5 text-[var(--consumer-muted)]">
+            {verified
+              ? "Readiness history builds as completed source checks are recorded."
+              : client.analysisPending !== null
+                ? "The first verified figure lands here when the analysis completes."
+                : "Readiness history builds as completed source checks are recorded."}
           </p>
-        ) : (
-          <p className="text-xl font-semibold text-[var(--consumer-muted)]">Not yet verified</p>
-        )}
-        </FadeSwap>
-        <p className="mt-4 max-w-[38ch] text-xs leading-5 text-[var(--consumer-muted)]">
-          Readiness history builds as completed source checks are recorded.
-        </p>
+        </div>
       </div>
       <div className="mt-3 grid grid-cols-2 gap-4 pt-1 text-xs">
         <div>
@@ -2065,6 +2080,21 @@ function FundingPlanView({
 
 function JourneyTimeline({ analysisActive, canceled, currentStage, durable }: { analysisActive: boolean; canceled: boolean; currentStage: FundingStage; durable?: { analysisComplete: boolean; currentDateLabel: string } }) {
   const currentStageIndex = FUNDING_STAGES.indexOf(currentStage);
+  // A stage change while the page is open is the one moment this list has to show rather than
+  // merely reflect. The row that just became current settles its border (the repo's own cue for
+  // "the row that moved") and carries a dated line of record; the node that just completed plays
+  // its finished motion once through JourneyStepIcon, and the rule between them starts flowing.
+  const [seenStageIndex, setSeenStageIndex] = useState(currentStageIndex);
+  const [advancedTo, setAdvancedTo] = useState<number | null>(null);
+  if (seenStageIndex !== currentStageIndex) {
+    setSeenStageIndex(currentStageIndex);
+    if (currentStageIndex > seenStageIndex) setAdvancedTo(currentStageIndex);
+  }
+  useEffect(() => {
+    if (advancedTo === null) return;
+    const timer = window.setTimeout(() => setAdvancedTo(null), 6000);
+    return () => window.clearTimeout(timer);
+  }, [advancedTo]);
   // The Onboarding line asserted a completed analysis unconditionally, so on a durable workspace
   // with no analysis yet it sat two panels below a hero reading "Awaiting your first completed
   // analysis" and directly contradicted it. Both now read the same fact — `trackerClient.analysisAt`
@@ -2137,13 +2167,19 @@ function JourneyTimeline({ analysisActive, canceled, currentStage, durable }: { 
                   <JourneyStepIcon reducedMotion={stillCurrent} stage={stage.name.toLowerCase() as JourneyStage} status={iconStatus} />
                   {index < stages.length - 1 ? <JourneyConnector flowing={complete} stage={stage.name.toLowerCase() as JourneyStage} /> : null}
                 </div>
-                <div className="border-b border-[var(--consumer-border)] pb-6 last:border-0 last:pb-0">
+                <div className="border-b border-[var(--consumer-border)] pb-6 last:border-0 last:pb-0" data-timeline-settle={advancedTo === index ? "" : undefined}>
                   <div className="flex flex-wrap items-center gap-2">
                     <h2 className="text-sm font-semibold">{stage.name}</h2>
                     <StatusTag icon={stage.status === "Active" ? <JourneyActiveDot /> : complete || stillCurrent ? undefined : false} tone={complete ? "success" : stage.status === "Active" ? "info" : "neutral"}>{stage.status}</StatusTag>
                     <span className="ml-auto shrink-0 whitespace-nowrap text-xs text-muted-foreground">{stage.date}</span>
                   </div>
                   <p className="mt-2 text-xs leading-5 text-muted-foreground [text-wrap:pretty]">{stage.detail}</p>
+                  {advancedTo === index ? (
+                    <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-[var(--consumer-positive)]" data-motion-state>
+                      <Check aria-hidden className="size-3.5 stroke-[2.6]" />
+                      Moved to {stage.name} · {stage.date}
+                    </p>
+                  ) : null}
                   {active && stage.name === "Optimization" && !durable ? (
                     <div className="mt-4 grid gap-2 rounded-[8px] bg-[var(--consumer-canvas)] p-3 text-xs sm:grid-cols-3">
                       <span className="flex items-center gap-2"><StateMarker size="sm" state="todo" /> Utilization: open</span>
@@ -2293,7 +2329,7 @@ function DurableMatchesView({
                 <div className="mt-6 border-t border-[var(--consumer-border)] pt-5">
                   <h3 className="text-sm font-semibold">Result</h3>
                   {selected.outcome ? (
-                    <div className="mt-3 rounded-[8px] bg-[var(--consumer-canvas)] p-4"><p className="text-sm font-semibold capitalize">{selected.outcome.kind}</p><p className="mt-1 text-xs text-muted-foreground">Recorded {formatDate(selected.outcome.decidedOn)} by {selected.outcome.recordedByKind === "consumer" ? "you" : "your funding team"}{selected.outcome.amountCents ? ` · ${(selected.outcome.amountCents / 100).toLocaleString("en-US", { currency: "USD", style: "currency" })}` : ""}</p></div>
+                    <div className="mt-3 rounded-[8px] bg-[var(--consumer-canvas)] p-4" data-motion-state key={selected.id}><p className="flex items-center gap-2 text-sm font-semibold capitalize">{selected.outcome.kind === "approved" ? <span className="contents" data-mark-pop><StateMarker size="sm" state="verified" /></span> : null}{selected.outcome.kind}</p><p className="mt-1 text-xs text-muted-foreground">Recorded {formatDate(selected.outcome.decidedOn)} by {selected.outcome.recordedByKind === "consumer" ? "you" : "your funding team"}{selected.outcome.amountCents ? ` · ${(selected.outcome.amountCents / 100).toLocaleString("en-US", { currency: "USD", style: "currency" })}` : ""}</p></div>
                   ) : (
                     <div className="mt-3"><p className="text-xs text-muted-foreground">Current status: <span className="font-semibold uppercase text-foreground">{selected.consumerStatus}</span>. Record a final lender response when it arrives.</p><div className="mt-3 flex flex-wrap gap-2">{(["approved", "denied", "withdrawn"] as const).map((kind) => <Button aria-pressed={selectedOutcomeDraft.kind === kind} className="min-h-11" key={kind} onClick={() => setOutcomeDrafts((current) => ({ ...current, [selected.id]: { approvedAmount: current[selected.id]?.approvedAmount ?? "", kind } }))} size="sm" variant={selectedOutcomeDraft.kind === kind ? "default" : "outline"}>{kind.toUpperCase()}</Button>)}</div>{selectedOutcomeDraft.kind === "approved" ? <label className="mt-4 block max-w-xs text-xs font-medium">Approved amount<Input className="mt-2 min-h-11" inputMode="decimal" onChange={(event) => setOutcomeDrafts((current) => ({ ...current, [selected.id]: { approvedAmount: event.target.value, kind: current[selected.id]?.kind ?? "approved" } }))} placeholder="0.00" value={selectedOutcomeDraft.approvedAmount} /></label> : null}<Button className="mt-4 min-h-11" disabled={selectedPending !== undefined} onClick={() => void saveOutcome()}>{selectedPending === "outcome" ? "Saving result" : "Save result"}</Button></div>
                   )}

@@ -256,6 +256,7 @@ import {
   type TrackerClientStatusPatch,
   type TrackerReadFilters,
 } from "@/lib/tracker/types";
+import { useCountUp, usePrevious } from "@/lib/motion/hooks";
 import { cn } from "@/lib/utils";
 
 type View =
@@ -1030,6 +1031,14 @@ type TrackerFilterRestore = Readonly<{
   status(value: TrackerClientStatus | "all"): void;
   team(value: string): void;
 }>;
+
+/** A pipeline stage count that ticks green when a client moves in or out while the board is open. */
+function PipelineCount({ count }: { count: number }) {
+  const shown = useCountUp(count, 700) ?? count;
+  const previous = usePrevious(count);
+  const ticked = previous !== undefined && previous !== count;
+  return <span className="inline-block text-right tabular-nums" data-count-tick={ticked ? "" : undefined} key={ticked ? count : "rest"}>{shown}</span>;
+}
 
 /** Hydrate the editable tracker controls from the browser URL after mount. */
 function restoreTrackerFiltersFromLocation(apply: TrackerFilterRestore): void {
@@ -3003,7 +3012,7 @@ export function OperatorSurface({
                     <div className="h-2 overflow-hidden rounded-full bg-muted">
                       <div
                         className={cn(
-                          "h-full rounded-full",
+                          "h-full rounded-full transition-[width] duration-[var(--duration-very-slow)] ease-[var(--ease-smooth-out)] motion-reduce:transition-none",
                           stage === "optimization"
                             ? "bg-primary"
                             : stage === "funded" || stage === "graduate"
@@ -3013,7 +3022,7 @@ export function OperatorSurface({
                         style={{ width: `${(count / maxPipeline) * 100}%` }}
                       />
                     </div>
-                    <span className="text-right tabular-nums">{count}</span>
+                    <PipelineCount count={count} />
                   </div>
                 ))}
               </div>
@@ -3197,7 +3206,7 @@ export function OperatorSurface({
                         style={{ width: `${(count / maxPipeline) * 100}%` }}
                       />
                     </div>
-                    <span className="text-right tabular-nums">{count}</span>
+                    <PipelineCount count={count} />
                   </div>
                 ))}
               </div>

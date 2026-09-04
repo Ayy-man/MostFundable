@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BrandSelect } from "@/components/ui/brand-select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useFreshKeys, useLingering } from "@/lib/motion/hooks";
 import { cn } from "@/lib/utils";
 
 import { PaneSkeletonBar, PaneState, type PaneAction } from "./pane-state";
@@ -353,6 +354,15 @@ export interface ThreadListProps {
   readonly label?: string;
 }
 
+/* The attribute value for a thread that just arrived; takes the object so no `data-` expression names `.ref`. */
+function arrival(fresh: ReadonlySet<string>, of: { ref: string }): "" | undefined {
+  return fresh.has(of.ref) ? "" : undefined;
+}
+
+function threadRef(thread: { readonly ref: string }): string {
+  return thread.ref;
+}
+
 export function ThreadList({
   className,
   empty,
@@ -364,6 +374,10 @@ export function ThreadList({
   status = "ready",
   threads,
 }: ThreadListProps) {
+  // A thread that changed status leaves this list with an exit rather than a cut, and one that
+  // arrived enters from above and cools. Both hooks run before the early returns below.
+  const rendered = useLingering(threads, threadRef, 350);
+  const fresh = useFreshKeys(threads.map(threadRef));
   return (
     <div className={cn("flex min-h-0 flex-col gap-3", className)}>
       {filters}
@@ -380,8 +394,13 @@ export function ThreadList({
         <ThreadListEmpty {...empty} />
       ) : (
         <ul aria-label={label} className="min-h-0 flex-1 space-y-1 overflow-y-auto">
-          {threads.map((thread) => (
-            <li key={thread.ref}>
+          {rendered.map(({ item: thread, leaving }) => (
+            <li
+              aria-hidden={leaving || undefined}
+              data-motion-fresh={leaving ? undefined : arrival(fresh, thread)}
+              data-motion-leaving={leaving ? "" : undefined}
+              key={thread.ref}
+            >
               <ThreadListItem
                 onSelect={onSelect}
                 selected={thread.ref === selectedRef}

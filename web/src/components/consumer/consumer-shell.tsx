@@ -27,6 +27,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { usePrevious } from "@/lib/motion/hooks";
 import { cn } from "@/lib/utils";
 
 export type ConsumerNavItem = {
@@ -70,6 +71,9 @@ function NavButton({
   onClick: () => void;
 }) {
   const Icon = item.icon;
+  // The unread count pops when it rises while the shell is open; a fall, or the first paint, is still.
+  const previousBadge = usePrevious(badge ?? 0);
+  const badgeRose = previousBadge !== undefined && (badge ?? 0) > previousBadge;
 
   return (
     <button
@@ -90,7 +94,7 @@ function NavButton({
       <Icon aria-hidden className={cn("size-4 shrink-0", active && "stroke-[2.2]")} />
       <span className={cn("min-w-0 flex-1 truncate whitespace-nowrap", collapsed && "sr-only")}>{item.label}</span>
       {badge ? (
-        <span className={cn("shrink-0 rounded-full bg-[var(--consumer-negative)] px-2 py-0.5 text-[0.65rem] font-bold text-[var(--consumer-canvas)] tabular-nums", collapsed && "absolute right-0 top-0 min-w-4 px-1 text-center leading-4")}>
+        <span className={cn("shrink-0 rounded-full bg-[var(--consumer-negative)] px-2 py-0.5 text-[0.65rem] font-bold text-[var(--consumer-canvas)] tabular-nums", collapsed && "absolute right-0 top-0 min-w-4 px-1 text-center leading-4")} data-badge-pop={badgeRose ? "" : undefined} key={badgeRose ? badge : "rest"}>
           {badge}
         </span>
       ) : (

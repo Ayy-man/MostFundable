@@ -31,6 +31,7 @@ import {
 import { ConsumerPageHeader } from "@/components/consumer/consumer-kit";
 import { ConsumerNotificationPreferences } from "@/components/consumer/notification-preferences";
 import { Button } from "@/components/ui/button";
+import { useFreshKeys } from "@/lib/motion/hooks";
 import { cn } from "@/lib/utils";
 import type { ConsumerNotificationPreferences as ConsumerNotificationPreferenceList } from "@/lib/notifications/preferences";
 
@@ -507,6 +508,8 @@ export function ConsumerNotificationsView({
 
   const chips = useMemo(() => filterCounts(events), [events]);
   const unreadCount = events.filter((event) => event.readAt === null).length;
+  // Rows that arrived while the page was open enter and cool; the list that mounts full does not.
+  const freshIds = useFreshKeys(events.map((event) => event.id));
 
   /**
    * A refetch can drop the last event of a type and take its chip with it. The fallback to All is
@@ -935,6 +938,7 @@ export function ConsumerNotificationsView({
                         <li
                           className="border-t border-[var(--consumer-border)] [&:first-child]:border-t-0"
                           data-feed-row
+                          data-motion-fresh={freshIds.has(row.event.id) ? "" : undefined}
                           key={row.event.id}
                         >
                           <Row

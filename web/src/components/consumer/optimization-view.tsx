@@ -37,6 +37,7 @@ import {
   type DisplayStateV1,
   type TrackKindV1,
 } from "@/lib/optimization/view-model";
+import { useCountUp, useLingering, usePrevious } from "@/lib/motion/hooks";
 import { cn } from "@/lib/utils";
 
 import type { ConsumerOptimizationV1, FactorV1, TrackV1 } from "@/lib/optimization/types";
@@ -599,11 +600,16 @@ function AnalysisStamp({ analysisAt, canceled }: { analysisAt: string | null; ca
 }
 
 function AsideShell({ children, total, verified }: { children: ReactNode; total: number; verified: number }) {
+  // The figure counts to its value and ticks green when a factor is verified while the page is
+  // open, so the checklist row that moved and the number it moved are read as one event.
+  const shown = useCountUp(verified, 900) ?? verified;
+  const previous = usePrevious(verified);
+  const ticked = previous !== undefined && previous !== verified;
   return (
     <aside className="border-t border-[var(--consumer-border)] bg-[var(--consumer-panel,var(--consumer-canvas))] p-5 xl:border-l xl:border-t-0 xl:p-7">
       <h3 className="text-[0.68rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground">Where you stand</h3>
       <p className="mt-2 flex flex-wrap items-baseline gap-2">
-        <b className="text-[2.2rem] font-semibold leading-none tracking-[-0.04em] tabular-nums">{verified} of {total}</b>
+        <b className="inline-block text-[2.2rem] font-semibold leading-none tracking-[-0.04em] tabular-nums" data-count-tick={ticked ? "" : undefined} key={ticked ? verified : "rest"}>{shown} of {total}</b>
         <span className="text-sm text-muted-foreground">verified · Ready at {total} of {total}</span>
       </p>
       <ul className="mt-4">{children}</ul>
@@ -717,6 +723,10 @@ function ReportControl({
   );
 }
 
+function factorKey(factor: FactorV1): string {
+  return factor.key;
+}
+
 function Track({
   canceled,
   filter,
@@ -750,6 +760,9 @@ function Track({
   const showAll = filter === "done" || summary.complete || showVerified || (desktop && openRows.length <= 2 && !summary.complete);
   const visible = showAll ? track.factors : openRows;
   const hidden = track.factors.length - visible.length;
+  // A factor that was just verified slides out of the open list rather than vanishing; the row is
+  // kept for the length of the exit and then dropped. Under reduced motion it is simply gone.
+  const rendered = useLingering(visible, factorKey, 400);
   const isOpen = desktop ? !summary.complete || expanded === true : expanded ?? open;
   /*
    * One row per track renders open on first paint, because the disclosure has no
@@ -799,7 +812,7 @@ function Track({
             </p>
             {rollupNote ? <p className="mt-2 text-xs leading-5 text-muted-foreground">{rollupNote}</p> : null}
           </div>
-          <span className="text-sm font-semibold tabular-nums">{summary.pct}%</span>
+          <TrackPercent pct={summary.pct} />
         </div>
         <div className="mt-3">
           <ProgressBar checkingPct={summary.pctChecking} label={`${label} checklist completion`} pct={summary.pct} />
@@ -818,20 +831,21 @@ function Track({
                 : "Name, industry, entity age, net asset value, identifier, email and website. Upload them in Onboarding & Docs at any time."}
             </p>
           </div>
-        ) : visible.length ? (
-          visible.map((factor) => (
-            <FactorRow
-              canceled={canceled}
-              defaultOpen={factor.key === defaultOpenKey}
-              factor={factor}
-              key={factor.key}
-              onInstructions={onInstructions}
-              onReport={onReport}
-              pending={pendingKey === factor.key}
-              reportingOpen={reportingOpen}
-              suppressLead={summary.sameDocsLead || rollupNote !== null}
-              track={track}
-            />
+        ) : rendered.length ? (
+          rendered.map(({ item: factor, leaving }) => (
+            <div aria-hidden={leaving || undefined} data-motion-leaving={leaving ? "" : undefined} key={factor.key}>
+              <FactorRow
+                canceled={canceled}
+                defaultOpen={factor.key === defaultOpenKey}
+                factor={factor}
+                onInstructions={onInstructions}
+                onReport={onReport}
+                pending={pendingKey === factor.key}
+                reportingOpen={reportingOpen}
+                suppressLead={summary.sameDocsLead || rollupNote !== null}
+                track={track}
+              />
+            </div>
           ))
         ) : (
           <p className="py-5 text-sm text-muted-foreground">Every known factor in this track is already done.</p>
@@ -844,6 +858,13 @@ function Track({
       </div>
     </details>
   );
+}
+
+function TrackPercent({ pct }: { pct: number }) {
+  const shown = useCountUp(pct, 900) ?? pct;
+  const previous = usePrevious(pct);
+  const ticked = previous !== undefined && previous !== pct;
+  return <span className="inline-block text-sm font-semibold tabular-nums" data-count-tick={ticked ? "" : undefined} key={ticked ? pct : "rest"}>{shown}%</span>;
 }
 
 function FactorRow({
@@ -883,6 +904,10 @@ function FactorRow({
       : null;
   const isYou = owner === "you" && factor.key === "utilization_under_30";
   const showControls = isYou && state !== "verified";
+  // The mark pops once when this row becomes verified while on screen; a row that mounts verified
+  // is simply verified.
+  const previousState = usePrevious(state);
+  const justVerified = state === "verified" && previousState !== undefined && previousState !== "verified";
 
   return (
     /*
@@ -911,7 +936,7 @@ function FactorRow({
         light the chevron as though the control were under the cursor.
       */}
       <summary className="group/summary grid min-h-12 cursor-pointer list-none grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 rounded-[8px] px-2 py-1.5 transition-colors duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] [&::-webkit-details-marker]:hidden hover:bg-[var(--muted)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--consumer-accent-ink)] group-open/factor:hover:bg-[color-mix(in_srgb,var(--consumer-muted),transparent_90%)] motion-reduce:transition-none sm:grid-cols-[auto_minmax(0,1fr)_auto_auto] sm:gap-y-0">
-        <StateMarker size="sm" state={markerFor(state)} />
+        <span className="contents" data-mark-pop={justVerified ? "" : undefined}><StateMarker size="sm" state={markerFor(state)} /></span>
         <p className="min-w-0 text-sm font-medium">{factor.title}</p>
         {/*
           Only the neutral chip is restyled, and only because its canvas fill is

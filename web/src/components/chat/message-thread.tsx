@@ -34,6 +34,7 @@ import {
 } from "@/components/ai-elements/conversation";
 import { MessageAttachment, MessageAttachments } from "@/components/ai-elements/message";
 import { Button } from "@/components/ui/button";
+import { useFreshKeys } from "@/lib/motion/hooks";
 import { cn } from "@/lib/utils";
 
 import { PaneState, type PaneFallback } from "./pane-state";
@@ -332,6 +333,9 @@ export function MessageThread({
   state,
   timeline,
 }: MessageThreadProps) {
+  // An item that arrived while the thread was open enters from above and holds the accent tint
+  // for a moment; the thread that mounts full is still. Hooks run before any early return.
+  const fresh = useFreshKeys(items.map(itemRef));
   // The fallback is passed whole rather than sliced apart, so a caller that says `loading` is made
   // to hand over a skeleton and one that says `empty` is made to teach — the guarantees live in
   // the union and this component does not get to weaken them on the way through.
@@ -372,18 +376,19 @@ export function MessageThread({
       <ConversationContent>
         {header}
         {timeline
-          ? renderTimelineBlocks(items, isOwn, timeline)
+          ? renderTimelineBlocks(items, isOwn, timeline, fresh)
           : groupThreadItems(items, isOwn).map((block, index) =>
               block.type === "divider" ? (
                 <DayDivider at={block.at} key={`divider-${block.at}-${index}`} />
               ) : block.type === "event" ? (
-                <div key={block.event.ref}>{renderEvent(block.event)}</div>
+                <div data-motion-fresh={arrival(fresh, block.event)} key={block.event.ref}>{renderEvent(block.event)}</div>
               ) : (
-                <MessageGroup
-                  key={block.messages[0].ref}
-                  messages={block.messages}
-                  own={block.own}
-                />
+                <div data-motion-fresh={arrival(fresh, block.messages[0])} key={block.messages[0].ref}>
+                  <MessageGroup
+                    messages={block.messages}
+                    own={block.own}
+                  />
+                </div>
               ),
             )}
         {footer}
@@ -401,10 +406,22 @@ export function MessageThread({
  * left here is one block kind to one component, which is the only shape in which "the operator sees
  * a row the client cannot" is checkable without a browser.
  */
+function itemRef(item: ChatThreadItem): string {
+  if (item.type === "message") return item.message.ref;
+  return item.timeline?.ref ?? item.event?.ref ?? "";
+}
+
+/* The attribute value for a block that just arrived: present (empty) or absent. Takes the whole
+   object rather than its handle so no `data-` attribute expression ever names `.ref`. */
+function arrival(fresh: ReadonlySet<string>, of: { ref: string }): "" | undefined {
+  return fresh.has(of.ref) ? "" : undefined;
+}
+
 function renderTimelineBlocks(
   items: readonly ChatThreadItem[],
   isOwn: (message: ChatMessage) => boolean,
   timeline: TimelineThreadOptions,
+  fresh: ReadonlySet<string>,
 ): ReactNode {
   const settled = new Set(timeline.settledRefs ?? []);
   const { blocks } = groupTimeline(items, timeline.audience, isOwn, timeline);
@@ -419,13 +436,19 @@ function renderTimelineBlocks(
         );
       case "group":
         return (
-          <MessageGroup key={block.messages[0].ref} messages={block.messages} own={block.own} />
+          <div data-motion-fresh={arrival(fresh, block.messages[0])} key={block.messages[0].ref}>
+            <MessageGroup messages={block.messages} own={block.own} />
+          </div>
         );
       case "line":
-        return <TimelineEventLine key={block.row.ref} view={block.view} />;
+        return (
+          <div data-motion-fresh={arrival(fresh, block.row)} key={block.row.ref}>
+            <TimelineEventLine view={block.view} />
+          </div>
+        );
       case "band":
         return (
-          <div className="flex justify-center" key={block.row.ref}>
+          <div className="flex justify-center" data-motion-fresh={arrival(fresh, block.row)} key={block.row.ref}>
             <TimelineEventBand
               handlers={timeline.handlers}
               row={block.row}

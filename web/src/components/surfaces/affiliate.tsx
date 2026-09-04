@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import {
   BarChart3,
   BookOpen,
@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 
 import { operatorBrandInitials } from "@/components/consumer/consumer-shell";
+import { JourneyStageMark, type JourneyStage } from "@/components/consumer/journey-step-icon";
+import { usePrevious } from "@/lib/motion/hooks";
 import { DemoRoleTrigger } from "@/components/demo/demo-chrome";
 import { useFeedbackSession } from "@/components/demo/feedback-session";
 import {
@@ -180,28 +182,40 @@ function ReferralIdentity({ lead }: { lead: AffiliateLead }) {
 
 function StageTrack({ stage }: { stage: FundingStage }) {
   const activeIndex = FUNDING_STAGES.indexOf(stage);
+  // On a stage change only the changed segment moves: the rule into the new stage fills, its
+  // glyph pops once, and the label slides in. Everything else on the row holds still.
+  const previousIndex = usePrevious(activeIndex);
+  const advanced = previousIndex !== undefined && activeIndex > previousIndex;
 
   return (
     <div
       aria-label={`Stage: ${stage}`}
-      className="flex min-w-40 items-center gap-2.5"
+      className="flex min-w-44 items-center gap-3"
     >
-      <div aria-hidden className="flex flex-1 gap-1">
+      <div aria-hidden className="flex items-center gap-1">
         {FUNDING_STAGES.map((item, index) => (
-          <span
-            className={cn(
-              "h-1.5 flex-1 rounded-full",
-              index < activeIndex
-                ? "bg-[color-mix(in_srgb,var(--consumer-positive),transparent_65%)]"
-                : index === activeIndex
-                  ? "bg-primary"
-                  : "bg-muted",
-            )}
-            key={item}
-          />
+          <Fragment key={item}>
+            {index > 0 ? (
+              <span
+                className={cn(
+                  "h-0.5 w-2 rounded-full",
+                  index <= activeIndex
+                    ? "bg-[color-mix(in_srgb,var(--consumer-positive),transparent_60%)]"
+                    : "bg-[var(--consumer-border)]",
+                )}
+                data-rule-fill={advanced && index === activeIndex ? "" : undefined}
+              />
+            ) : null}
+            <span className="contents" data-mark-pop={advanced && index === activeIndex ? "" : undefined}>
+              <JourneyStageMark
+                stage={item.toLowerCase() as JourneyStage}
+                tone={index < activeIndex ? "past" : index === activeIndex ? "current" : "upcoming"}
+              />
+            </span>
+          </Fragment>
         ))}
       </div>
-      <span className="text-xs font-medium">{stage}</span>
+      <span className="text-xs font-medium" data-motion-state={advanced ? "" : undefined} key={advanced ? stage : "rest"}>{stage}</span>
     </div>
   );
 }

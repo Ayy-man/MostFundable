@@ -46,6 +46,7 @@ import {
   mockQuizAnswer,
   mockQuizOptions,
 } from "@/lib/idv/config";
+import { usePrevious } from "@/lib/motion/hooks";
 import { cn } from "@/lib/utils";
 
 // Adapted from the authenticated @shadcnblocks/onboarding1 registry block.
@@ -406,6 +407,10 @@ export function Onboarding1({
   const [codeError, setCodeError] = useState("");
   const [verifying, setVerifying] = useState(false);
   const [verified, setVerified] = useState(false);
+  // For the stepper: the cell that just completed pops its check once, and the verify cell rings
+  // once on the render where identity becomes verified.
+  const previousStep = usePrevious(step);
+  const previousVerified = usePrevious(verified) ?? false;
   const [resent, setResent] = useState(false);
   const [identityMode, setIdentityMode] = useState<"sms" | "quiz" | "locked">(openingDraft.identityMode);
   const [quizAttempts, setQuizAttempts] = useState(openingDraft.quizAttempts);
@@ -737,13 +742,23 @@ export function Onboarding1({
       <div className="mx-auto w-full max-w-[74rem] px-4 py-5 sm:px-6 sm:py-8">
         <ol
           aria-label="Enrollment progress"
-          className="mb-5 grid grid-cols-5 overflow-hidden rounded-[10px] border border-[var(--consumer-border)] bg-card sm:mb-6"
+          className="relative mb-5 grid grid-cols-5 overflow-hidden rounded-[10px] border border-[var(--consumer-border)] bg-card sm:mb-6"
         >
+          {/*
+            One green line along the top edge grows to the current step, so progress reads as a
+            single shape rather than five separate cells changing colour. Identity verification is
+            the one step that earns a ring: it is the point at which money is taken.
+          */}
+          <span
+            aria-hidden
+            className="absolute inset-x-0 top-0 h-0.5 bg-[var(--consumer-positive)] transition-[width] duration-[var(--duration-very-slow)] ease-[var(--ease-smooth-out)] motion-reduce:transition-none"
+            style={{ width: `${((step + (verified ? 1 : 0.5)) / onboardingSteps.length) * 100}%` }}
+          />
           {onboardingSteps.map((item, index) => (
             <li
               aria-current={index === step ? "step" : undefined}
               className={cn(
-                "relative min-w-0 px-2 py-3 text-center sm:px-4 sm:text-left",
+                "relative min-w-0 px-2 py-3 text-center transition-colors duration-[var(--duration-slow)] ease-[var(--ease-smooth-out)] motion-reduce:transition-none sm:px-4 sm:text-left",
                 index > 0 && "border-l border-[var(--consumer-border)]",
                 index < step && "bg-[color-mix(in_srgb,var(--consumer-positive),transparent_94%)]",
                 index === step && "bg-[var(--consumer-accent-tint)]",
@@ -752,7 +767,7 @@ export function Onboarding1({
             >
               <span
                 className={cn(
-                  "mx-auto grid size-5 place-items-center rounded-full border text-[0.61rem] font-bold sm:mx-0",
+                  "mx-auto grid size-5 place-items-center rounded-full border text-[0.61rem] font-bold transition-colors duration-[var(--duration-slow)] ease-[var(--ease-smooth-out)] motion-reduce:transition-none sm:mx-0",
                   index < step &&
                     "border-[var(--consumer-positive)] bg-[var(--consumer-positive)] text-card",
                   index === step &&
@@ -760,6 +775,9 @@ export function Onboarding1({
                   index > step &&
                     "border-[var(--consumer-border)] text-muted-foreground",
                 )}
+                data-mark-pop={index < step && index === previousStep ? "" : undefined}
+                data-mark-ring={index === step && verified && !previousVerified ? "" : undefined}
+                key={index < step ? "done" : index === step ? "current" : "next"}
               >
                 {index < step ? <Check aria-hidden className="size-3" /> : index + 1}
               </span>
