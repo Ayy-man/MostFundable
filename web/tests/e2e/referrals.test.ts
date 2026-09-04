@@ -65,7 +65,7 @@ test("referral create, click, and exact-client conversion persist one lifecycle"
 
     const missingSession = await fetch(`${baseUrl}/api/referrals/convert`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", origin: requestOrigin },
       body: JSON.stringify({ clientId: REFERRAL_FIXTURE.destinationClientId }),
     });
     assert.equal(missingSession.status, 401);

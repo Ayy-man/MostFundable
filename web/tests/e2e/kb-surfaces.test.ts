@@ -20,6 +20,9 @@ describe("KB surfaces", { skip }, () => {
       path.join(webRoot, "scripts/verify-kb-api.mjs"),
     ], { cwd: webRoot, timeout: 175_000, maxBuffer: 2 * 1024 * 1024 });
     assert.equal(stderr, "");
-    assert.match(stdout, /KB API verification passed: 24 assertions\./);
+    // The verifier exits nonzero when any internal assertion fails. Its exact
+    // count grows with that script, so this wrapper checks for a positive run
+    // receipt instead of maintaining a second, immediately stale inventory.
+    assert.match(stdout, /^KB API verification passed: [1-9]\d* assertions\.\n$/);
   });
 });

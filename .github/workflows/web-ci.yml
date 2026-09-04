@@ -133,7 +133,6 @@ jobs:
           MF_BILLING_E2E_LOG: ${{ runner.temp }}/mostfundable-e2e.log
           MF_TENANCY_MAIL_E2E: "1"
           PAID_REFRESH_E2E: "1"
-          PAID_REFRESH_E2E_BASE_URL: http://localhost:3003
           REFERRAL_E2E: "1"
           REFERRAL_E2E_BASE_URL: http://localhost:3003
           REFERRAL_INTAKE_ORIGIN: http://localhost:3003
@@ -218,6 +217,40 @@ jobs:
           throw new Error(`local authenticated E2E server did not become ready at ${target}`);
           NODE
           node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/ts-resolve-hook.mjs --test --test-concurrency=1 --test-reporter=tap tests/e2e/affiliates.test.ts tests/e2e/fees-legal-gate.test.ts
+
+      - name: Mock paid-refresh end-to-end test
+        working-directory: web
+        env:
+          FEATURE_ANALYSIS: "1"
+          FEATURE_ANCILLARY: "1"
+          FEATURE_PAID_REFRESH: "1"
+          PAID_REFRESH_E2E: "1"
+          PAID_REFRESH_E2E_BASE_URL: http://localhost:3004
+        run: |
+          supabase db reset --local
+          eval "$(supabase status -o env)"
+          export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
+          export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
+          export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          npm run dev -- -H 127.0.0.1 -p 3004 > "$RUNNER_TEMP/mostfundable-paid-refresh-server.log" 2>&1 &
+          server_pid=$!
+          cleanup() {
+            kill "$server_pid" 2>/dev/null || true
+            wait "$server_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          node - <<'NODE'
+          const target = "http://localhost:3004/api/pricing/consumer";
+          for (let attempt = 0; attempt < 120; attempt += 1) {
+            try {
+              const response = await fetch(target);
+              if (response.status < 500) process.exit(0);
+            } catch {}
+            await new Promise((resolve) => setTimeout(resolve, 500));
+          }
+          throw new Error(`local paid-refresh server did not become ready at ${target}`);
+          NODE
+          node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/ts-resolve-hook.mjs --test --test-concurrency=1 --test-reporter=tap tests/e2e/paid-refresh.test.ts
 
       - name: Source and product gates
         working-directory: web
