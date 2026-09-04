@@ -2,12 +2,13 @@ import "server-only";
 
 import type { SessionProfile } from "../auth/session.ts";
 import { assistantMockResponder } from "../assistant/mock-responder.ts";
-import { featureFlag, resolveDriver } from "../env.ts";
+import { featureFlag } from "../env.ts";
 import type { ChatTransport } from "../llm/chat-transport.ts";
 import { createZdrChatTransport } from "../llm/chat-transport.ts";
 import { createMockChatTransport } from "../llm/mock-chat-transport.ts";
 import { createAdminKbAnswer, type AdminKbResult } from "./admin-answer.ts";
 import { CONSUMER_KB_IDENTITY, type ConsumerKbResult } from "./consumer.ts";
+import { resolveAssistantDriver } from "./driver.ts";
 import { runVaultReimportKb, type VaultReimportKbResult } from "./job.ts";
 import { resolveKbModel, resolveKbProviderSort, resolveKbReasoning } from "./model.ts";
 import { createOperatorKbAnswer, type OperatorKbResult } from "./operator.ts";
@@ -94,7 +95,7 @@ export function consumerAssistantFailure(error: unknown): ConsumerKbResult {
 // which is five places for them to drift. The plan engine builds its own
 // transport and none of this reaches it.
 function answerTransport(): ChatTransport {
-  return resolveDriver("ai") === "mock"
+  return resolveAssistantDriver() === "mock"
     ? createMockChatTransport(assistantMockResponder)
     : createZdrChatTransport({ apiKey: process.env.OPENROUTER_API_KEY, model: resolveKbModel(), reasoning: resolveKbReasoning(), providerSort: resolveKbProviderSort() });
 }
