@@ -24,12 +24,13 @@ import { createZdrChatTransport } from '../llm/chat-transport.ts';
 import { createMockChatTransport } from '../llm/mock-chat-transport.ts';
 import { encodeAnswerBody } from '../kb/answer-body.ts';
 import { resolveKbModel, resolveKbProviderSort, resolveKbReasoning } from '../kb/model.ts';
+import { assistantMockResponder } from './mock-responder.ts';
 import { answerAssistantQuestion } from './orchestrator.ts';
 import { toAssistantSources } from './sources.ts';
 import { AssistantError } from './types.ts';
 
 import type { SessionProfile } from '../auth/session.ts';
-import type { ChatRequest, ChatTransport } from '../llm/chat-transport.ts';
+import type { ChatTransport } from '../llm/chat-transport.ts';
 import type { AdminKbDependencies } from '../kb/admin-answer.ts';
 import type { OperatorKbDependencies } from '../kb/operator.ts';
 import type { AssistantProgressEvent, AssistantScope, AssistantSource } from './types.ts';
@@ -60,41 +61,9 @@ export interface AssistantAnswerDependencies {
   readonly adminDependencies?: Omit<AdminKbDependencies, 'transport' | 'onProgress'>;
 }
 
-/**
- * The mock responder, mirroring the one in `lib/kb/handlers.ts`.
- *
- * It is a copy rather than an import because that one is module-private there,
- * and exporting it would widen a file this lane does not own. A mock is the one
- * kind of duplication worth accepting: it has no behaviour to keep in step
- * beyond producing a shape the real pipeline's parser accepts.
- */
-function mockResponder(request: ChatRequest): unknown {
-  if (request.operation === 'assistant-route.select') {
-    const body = JSON.parse(request.messages[1]?.content ?? '{}') as { question?: unknown; tools?: Array<{ name?: unknown }> };
-    const names = (body.tools ?? []).flatMap((tool) => typeof tool.name === 'string' ? [tool.name] : []);
-    const question = typeof body.question === 'string' ? body.question.toLowerCase() : '';
-    const dataQuestion = /client|application|fee|revenue|operator|audit|bank|readiness|stage|status/.test(question);
-    const preferred = dataQuestion ? names[0] : undefined;
-    return preferred === undefined ? { route: 'knowledge', tools: [] } : { route: 'workspace', tools: [{ name: preferred }] };
-  }
-  if (!request.operation.endsWith('candidate')) return { approved: true };
-  const body = JSON.parse(request.messages[1]?.content ?? '{}') as {
-    documents?: Array<{ id?: unknown; title?: unknown }>;
-  };
-  const first = body.documents?.[0];
-  if (typeof first?.id !== 'string' || typeof first.title !== 'string') {
-    return { bullets: [], citations: [], headline: 'No grounded answer is available.' };
-  }
-  return {
-    bullets: [],
-    citations: [{ id: first.id }],
-    headline: 'The cited workspace information supports this answer.',
-  };
-}
-
 function productionTransport(): ChatTransport {
   return resolveDriver('ai') === 'mock'
-    ? createMockChatTransport(mockResponder)
+    ? createMockChatTransport(assistantMockResponder)
     : createZdrChatTransport({ apiKey: process.env.OPENROUTER_API_KEY, model: resolveKbModel(), reasoning: resolveKbReasoning(), providerSort: resolveKbProviderSort() });
 }
 

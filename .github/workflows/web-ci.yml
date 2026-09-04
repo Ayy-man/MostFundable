@@ -96,7 +96,7 @@ jobs:
           status=0
           npm run test:e2e || status=$?
           if [ "$status" -ne 0 ] && [ -f "$MF_BILLING_E2E_LOG" ]; then
-            awk '/route_failure|Error:|TypeError:|ReferenceError:|SyntaxError:/' "$MF_BILLING_E2E_LOG" | tail -200
+            tail -250 "$MF_BILLING_E2E_LOG"
           fi
           exit "$status"
 

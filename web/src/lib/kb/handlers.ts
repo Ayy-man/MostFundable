@@ -1,8 +1,9 @@
 import "server-only";
 
 import type { SessionProfile } from "../auth/session.ts";
+import { assistantMockResponder } from "../assistant/mock-responder.ts";
 import { featureFlag, resolveDriver } from "../env.ts";
-import type { ChatRequest, ChatTransport } from "../llm/chat-transport.ts";
+import type { ChatTransport } from "../llm/chat-transport.ts";
 import { createZdrChatTransport } from "../llm/chat-transport.ts";
 import { createMockChatTransport } from "../llm/mock-chat-transport.ts";
 import { createAdminKbAnswer, type AdminKbResult } from "./admin-answer.ts";
@@ -88,25 +89,13 @@ export function consumerAssistantFailure(error: unknown): ConsumerKbResult {
   return { ...failure, identity: CONSUMER_KB_IDENTITY, citations: [] };
 }
 
-// The deterministic responder, matching the candidate schema in chat-driver.ts.
-// It cites by handle because that is all the model is shown now (F-05), and it
-// returns a headline with no bullets because a fixed bullet list would be
-// content this driver has no basis for.
-function mockResponder(request: ChatRequest): unknown {
-  if (!request.operation.endsWith("candidate")) return { approved: true };
-  const body = JSON.parse(request.messages[1]?.content ?? "{}") as { documents?: Array<{ id?: unknown; title?: unknown }> };
-  const first = body.documents?.[0];
-  if (typeof first?.id !== "string" || typeof first.title !== "string") return { bullets: [], citations: [], headline: "No grounded answer is available." };
-  return { bullets: [], citations: [{ id: first.id }], headline: "The cited workspace information supports this answer." };
-}
-
 // Bound at transport construction rather than passed per call: the KB's
 // operations would otherwise carry the same two settings at five call sites,
 // which is five places for them to drift. The plan engine builds its own
 // transport and none of this reaches it.
 function answerTransport(): ChatTransport {
   return resolveDriver("ai") === "mock"
-    ? createMockChatTransport(mockResponder)
+    ? createMockChatTransport(assistantMockResponder)
     : createZdrChatTransport({ apiKey: process.env.OPENROUTER_API_KEY, model: resolveKbModel(), reasoning: resolveKbReasoning(), providerSort: resolveKbProviderSort() });
 }
 
