@@ -1,29 +1,32 @@
 // Support draft driver selection.
 //
-// One selector, two consumers: `resolveDriver('ai', env)` is the integration-owned
-// table in `env.ts` that the plan engine already uses, so support adds no new
-// environment key and cannot drift out of step with lane C's choice.
+// `SUPPORT_DRAFT_DRIVER` is support's own key, resolved through the shared
+// resolver in `env.ts` so the semantics stay identical to the frozen §10 table
+// (blank is unset, a present key never auto-upgrades a driver, an unknown value
+// throws, a missing required key names every missing key at once) without
+// editing a table an interface ask governs. It used to read `AI_DRIVER`, which
+// it shared with the KB assistants and the admin eval policy, and `llm/driver.ts`
+// records what that costs: flipping one service's driver silently reconfigured
+// the others. `AI_DRIVER` is still read as a fallback for one release, with a
+// warning naming this key, so a deployment already running on it keeps the
+// driver it has.
 //
-// The `openrouter` arm constructs successfully and rejects on use (IA-13-01).
-// The reason is concrete rather than stylistic: `llm/driver.ts:33` evaluates
-// `createPlanDriver(process.env)` at module load, so the moment lane C flips
-// `AI_DRIVER=openrouter` the selector resolves that arm for every consumer of
-// the `ai` driver, support included. A throwing constructor would break module
-// import in production, for an unrelated change, with a stack trace nobody was
-// looking for. Rejecting on use degrades support to human-only messaging, which
-// is the safe direction for this phase specifically — a support thread with no
-// draft affordance still works.
+// The `openrouter` arm is now the real driver: `createOpenRouterSupportDraftDriver`
+// over the zero-data-retention chat transport, the same transport the coach
+// builds. Nothing in this file starts a request — the transport constructs
+// eagerly and calls out only when a person asks for a draft — so selecting this
+// arm at module load still cannot fail an import.
 //
-// Lane C's ZDR-hardened transport stays private inside `createOpenRouterPlanDriver`,
-// and none of it is copied here. When IA-13-01 lands a narrow chat transport,
-// this arm swaps for it and nothing else in the phase moves.
+// `createUnavailableOpenRouterDraftDriver` below is no longer part of the
+// production path. It stays because `errors.ts` maps its code to a 503 and two
+// suites drive the "driver refused" branch of the service through it.
 
-import { resolveDriver } from '../env.ts';
+import { resolveDriverFromSpecWithDeprecatedSelector } from '../env.ts';
 import { createZdrChatTransport } from '../llm/chat-transport.ts';
 import { createMockSupportDraftDriver } from './mock-driver.ts';
 import { createOpenRouterSupportDraftDriver } from './openrouter-driver.ts';
 
-import type { EnvSource } from '../env.ts';
+import type { DriverSpec, EnvSource } from '../env.ts';
 import type {
   SupervisorVerdict,
   SupportDraftCandidate,
@@ -34,19 +37,41 @@ export const SUPPORT_DRAFT_DRIVER_UNAVAILABLE = 'SUPPORT_DRAFT_DRIVER_UNAVAILABL
 
 export const UNAVAILABLE_OPENROUTER_MODEL = 'openrouter-support-draft-unavailable';
 
+/** The key `AI_DRIVER` is being retired in favour of, per service. */
+export const DEPRECATED_AI_DRIVER_SELECTOR = 'AI_DRIVER';
+
+/**
+ * Support's own one-row driver table.
+ *
+ * `as const satisfies` rather than a `DriverSpec` annotation, for the reason
+ * `llm/driver.ts` gives: the annotation widens `values` to `string[]`, which
+ * would make the switch below non-exhaustive.
+ */
+export const SUPPORT_DRAFT_DRIVER_SPEC = {
+  selector: 'SUPPORT_DRAFT_DRIVER',
+  values: ['mock', 'openrouter'],
+  fallback: 'mock',
+  requires: { openrouter: ['OPENROUTER_API_KEY'] },
+} as const satisfies DriverSpec;
+
 export class SupportDraftDriverUnavailableError extends Error {
   readonly code = SUPPORT_DRAFT_DRIVER_UNAVAILABLE;
 
   constructor() {
     super(
-      'A live support draft driver is not wired yet. Lane C keeps its zero-data-retention ' +
-        'chat transport private, so drafting over a provider is unavailable until that ' +
-        'transport is exported (IA-13-01). Human messaging is unaffected.',
+      'A live support draft driver is not available. Human messaging is unaffected.',
     );
     this.name = 'SupportDraftDriverUnavailableError';
   }
 }
 
+/**
+ * A driver that constructs and then refuses.
+ *
+ * Not selected by anything in production any more. It is the fixture the
+ * service suites use to drive the branch where drafting is unavailable and to
+ * prove that branch writes no row, and `errors.ts` owns the 503 its code maps to.
+ */
 export function createUnavailableOpenRouterDraftDriver(): SupportDraftDriver {
   return {
     driver: 'openrouter',
@@ -62,17 +87,15 @@ export function createUnavailableOpenRouterDraftDriver(): SupportDraftDriver {
 
 export interface SupportDraftDriverFactories {
   createMock(): SupportDraftDriver;
-  createOpenRouter(): SupportDraftDriver;
+  createOpenRouter(apiKey: string): SupportDraftDriver;
 }
 
 const productionFactories: SupportDraftDriverFactories = {
   createMock: createMockSupportDraftDriver,
-  createOpenRouter: createUnavailableOpenRouterDraftDriver,
+  createOpenRouter(apiKey): SupportDraftDriver {
+    return createOpenRouterSupportDraftDriver(createZdrChatTransport({ apiKey }));
+  },
 };
-
-function isClearlyPlaceholderKey(value: string | undefined): boolean {
-  return value !== undefined && /(?:not-a-real|placeholder|example|fake)/i.test(value);
-}
 
 /**
  * Resolve the draft driver, per call.
@@ -85,18 +108,18 @@ export function createSupportDraftDriver(
   env: EnvSource = process.env,
   factories: SupportDraftDriverFactories = productionFactories,
 ): SupportDraftDriver {
-  const selected = resolveDriver('ai', env);
+  const selected = resolveDriverFromSpecWithDeprecatedSelector(
+    'support_draft',
+    SUPPORT_DRAFT_DRIVER_SPEC,
+    DEPRECATED_AI_DRIVER_SELECTOR,
+    env,
+  );
   switch (selected) {
     case 'mock':
       return factories.createMock();
     case 'openrouter':
-      if (factories === productionFactories && isClearlyPlaceholderKey(env.OPENROUTER_API_KEY)) {
-        return createUnavailableOpenRouterDraftDriver();
-      }
-      return factories === productionFactories
-        ? createOpenRouterSupportDraftDriver(
-            createZdrChatTransport({ apiKey: env.OPENROUTER_API_KEY }),
-          )
-        : factories.createOpenRouter();
+      // The resolver has already refused a blank key, so this cast narrows a
+      // value the spec proved is present rather than asserting a hope.
+      return factories.createOpenRouter(env.OPENROUTER_API_KEY as string);
   }
 }

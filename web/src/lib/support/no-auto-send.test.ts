@@ -14,9 +14,11 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
+import { createMockChatTransport } from '../llm/mock-chat-transport.ts';
 import { resolveDraftConfidenceThreshold } from './config.ts';
 import { runDraftEngine } from './engine.ts';
 import { createMockSupportDraftDriver } from './mock-driver.ts';
+import { createOpenRouterSupportDraftDriver } from './openrouter-driver.ts';
 import { SUPPORT_SEND_MESSAGE_RPC } from './repository.ts';
 import * as serviceModule from './service.ts';
 import { createSupportService } from './service.ts';
@@ -282,6 +284,43 @@ describe('generating a draft never produces a message', () => {
     assert.ok(log.recordedStatuses.includes('draft'));
 
     // One explicit action by a named person, and exactly one message.
+    await service.sendMessage(THREAD_ID, ACTOR, 'A reply a person decided to send.');
+    assert.equal(sendCount(log), 1);
+  });
+
+  // The same 64 conversations through the *real* provider driver — the one
+  // `SUPPORT_DRAFT_DRIVER=openrouter` now selects — with its chat transport
+  // stubbed so the suite makes no request. The mock driver above proves the
+  // service sends nothing; this proves the property does not live in the mock.
+  // Every draft here is approved and above the bar, which is the case that would
+  // tempt an implementation into sending one.
+  it('walks the same 64 conversations on the real openrouter driver and sends nothing', async () => {
+    const conversations = generateConversations(0x5eed_1301);
+    const log: CallLog = { names: [], recordedStatuses: [] };
+    let current = 0;
+    const transport = createMockChatTransport(
+      (request) =>
+        request.operation === 'support.candidate'
+          ? { body: 'The team is reviewing your file and will update you today.', confidence: 0.95 }
+          : { approved: true, codes: [] },
+      'support-no-auto-send-model',
+    );
+    const service = createSupportService({
+      repository: countingRepository(() => conversations[current], log),
+      createDriver: () => createOpenRouterSupportDraftDriver(transport),
+      env: {},
+    });
+
+    for (current = 0; current < conversations.length; current += 1) {
+      const draft = await service.generateDraft(THREAD_ID, ACTOR);
+      assert.equal(draft.status, 'approved', `conversation ${current}`);
+      assert.equal(sendCount(log), 0, `conversation ${current} sent a message`);
+    }
+
+    assert.equal(log.recordedStatuses.length, 64);
+    assert.equal(sendCount(log), 0);
+
+    // And one person's explicit action still produces exactly one message.
     await service.sendMessage(THREAD_ID, ACTOR, 'A reply a person decided to send.');
     assert.equal(sendCount(log), 1);
   });
