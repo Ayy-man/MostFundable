@@ -27,8 +27,12 @@
 // real model — today it cannot, because `evaluatePlan` recomputes every field it
 // checks and demands the model reproduce it exactly.
 //
-// The three remaining consumers of `AI_DRIVER` are still coupled. That is a known
-// gap with a lane of its own, not an oversight.
+// The three remaining consumers have since been split the same way, onto
+// `ASSISTANT_DRIVER` (the coach and the KB operations), `SUPPORT_DRAFT_DRIVER`
+// and `EVAL_DRIVER`. `AI_DRIVER` selects nothing on its own now: each of those
+// three still reads it as a deprecated fallback while its own key is blank, for
+// one release, and says so once in the log. `PLAN_DRIVER` never had that
+// fallback, because falling back was the bug it was fixing.
 
 import { resolveDriverFromSpec } from '../env.ts';
 import { createMockPlanDriver } from './mock-driver.ts';
