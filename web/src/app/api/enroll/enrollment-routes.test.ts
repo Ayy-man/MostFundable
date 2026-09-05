@@ -89,7 +89,7 @@ describe("enrollment mutation feature boundary", () => {
               parkedUntil: null, status: "active", subscription: null,
             };
           },
-          async submitIdv() { submitted += 1; throw new Error("provider submission must not run"); },
+          async submitIdvWithActivationTarget() { submitted += 1; throw new Error("provider submission must not run"); },
         },
       );
       assert.equal(response.status, 200);
@@ -105,7 +105,8 @@ describe("enrollment mutation feature boundary", () => {
     const previous = process.env.FEATURE_ENROLLMENT;
     process.env.FEATURE_ENROLLMENT = "1";
     const scheduled: Array<() => void | Promise<void>> = [];
-    let drains = 0;
+    const target = { analysisRunId: ID, clientId: ID };
+    const drains: Array<typeof target> = [];
     try {
       const response = await submitIdv(
         new Request(`http://local.test/api/enrollments/${ID}/idv`, { body: "{}", method: "POST" }),
@@ -127,16 +128,19 @@ describe("enrollment mutation feature boundary", () => {
               parkedUntil: null, status: "enrolled", subscription: null,
             };
           },
-          async submitIdv() {
+          async submitIdvWithActivationTarget() {
             return {
-              attemptsRemaining: 2, consents: [], enrollmentId: ID, idvState: "passed",
-              lockedUntil: null, milestones: [], needsOperatorAttention: null,
-              parkedUntil: null, status: "active", subscription: null,
+              analysisTarget: target,
+              view: {
+                attemptsRemaining: 2, consents: [], enrollmentId: ID, idvState: "passed",
+                lockedUntil: null, milestones: [], needsOperatorAttention: null,
+                parkedUntil: null, status: "active", subscription: null,
+              },
             };
           },
           after(callback) { scheduled.push(callback); },
-          async drainActivatedAnalysis() {
-            drains += 1;
+          async drainActivatedAnalysis(received) {
+            drains.push(received);
             throw new Error("the cron remains the safety net");
           },
         },
@@ -145,7 +149,7 @@ describe("enrollment mutation feature boundary", () => {
       assert.equal((await response.json()).status, "active");
       assert.equal(scheduled.length, 1, "activation schedules work after the response");
       await scheduled[0]();
-      assert.equal(drains, 1);
+      assert.deepEqual(drains, [target]);
     } finally {
       if (previous === undefined) delete process.env.FEATURE_ENROLLMENT;
       else process.env.FEATURE_ENROLLMENT = previous;

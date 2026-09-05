@@ -22,6 +22,7 @@
     "verify:security-headers": "node scripts/verify-security-headers.mjs --self-test",
     "verify:rls-matrix": "node scripts/verify-rls-matrix.mjs --inventory",
     "verify:live": "node scripts/verify-tracker-live.mjs",
+    "verify:crs-sandbox": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/ts-resolve-hook.mjs scripts/verify-crs-sandbox.mjs",
     "demo:reset": "cd .. && supabase db reset --local",
     "demo:seed": "cd .. && docker exec -i supabase_db_mostfundable psql -U postgres -d postgres -v ON_ERROR_STOP=1 -q < supabase/seed.sql",
     "demo:reset:cloud": "cd .. && supabase db push --linked --include-seed",

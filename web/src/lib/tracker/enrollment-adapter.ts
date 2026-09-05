@@ -4,6 +4,8 @@ import { onEnrollmentSucceeded } from "@/lib/analysis/worker";
 
 import { onEnrollmentActivated } from "./transition.server";
 
+import type { AnalysisJob } from "@/lib/analysis/ports";
+
 /**
  * Integration-owned glue between lane B's durable enrollment activation and the
  * two downstream entry points DEC-OWN-PHASE7-CHAIN names, in the order it fixes:
@@ -19,9 +21,12 @@ export type EnrollmentActivationInput = {
   enrollmentId: string;
 };
 
+/** The exact analysis row created by activation, sufficient for a targeted immediate drain. */
+export type EnrollmentAnalysisTarget = Pick<AnalysisJob, "analysisRunId" | "clientId">;
+
 export type EnrollmentGlueDependencies = {
   activateStage(input: { clientId: string; enrollmentId: string }): Promise<unknown>;
-  enqueueAnalysis(input: { clientId: string; enrollmentId: string }): Promise<unknown>;
+  enqueueAnalysis(input: { clientId: string; enrollmentId: string }): Promise<EnrollmentAnalysisTarget | null>;
 };
 
 const productionDependencies: EnrollmentGlueDependencies = {
@@ -62,7 +67,7 @@ export function createTrackerEnrollmentPort(
   dependencies: EnrollmentGlueDependencies = productionDependencies,
 ) {
   return Object.freeze({
-    async enrollmentActivated(input: EnrollmentActivationInput): Promise<void> {
+    async enrollmentActivated(input: EnrollmentActivationInput): Promise<EnrollmentAnalysisTarget | null> {
       try {
         await dependencies.activateStage({
           clientId: input.clientId,
@@ -73,12 +78,13 @@ export function createTrackerEnrollmentPort(
       }
 
       try {
-        await dependencies.enqueueAnalysis({
+        return await dependencies.enqueueAnalysis({
           clientId: input.clientId,
           enrollmentId: input.enrollmentId,
         });
       } catch (error) {
         reportGlueFailure("onEnrollmentSucceeded", input, error);
+        return null;
       }
     },
   });
