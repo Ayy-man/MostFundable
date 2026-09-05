@@ -248,7 +248,11 @@ export function normalizeReportBody(body: unknown, reportCodes: readonly ReportC
       }];
     }) : [];
     // `openedAt` is transient matching input; the normalized report must not retain it.
-    const normalizedAccounts = accounts.map(({ openedAt: _openedAt, ...account }) => account);
+    const normalizedAccounts = accounts.map((account) => {
+      const { openedAt, ...rest } = account;
+      void openedAt;
+      return rest;
+    });
     const monthlyDebtPaymentsCents = ['revolvingAccounts', 'mortgageAccounts', 'installmentAccounts', 'otherAccounts']
       .reduce((total, key) => {
         const group = isObject(summary[key]) ? summary[key] : {};
