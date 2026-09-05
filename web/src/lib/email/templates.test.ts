@@ -4,7 +4,6 @@ import { describe, it } from "node:test";
 import {
   CONSUMER_EMAIL_TEMPLATES,
   EMAIL_TEMPLATE_REGISTRY,
-  buildCrsAlertPayload,
   buildProviderVariables,
   deliveryReference,
   isConsumerEmailTemplate,
@@ -15,7 +14,6 @@ describe("email template registry", () => {
   it("is closed and frozen", () => {
     assert.deepEqual(Object.keys(EMAIL_TEMPLATE_REGISTRY), [
       "operator_card_failure",
-      "crs_alert",
       "consumer_monitoring_alert",
       "consumer_stage_change",
       "consumer_analysis_complete",
@@ -45,29 +43,6 @@ describe("email template registry", () => {
     assert.throws(() => validateTemplateVariables("operator_card_failure", {
       DELIVERY_REFERENCE: 42,
     }));
-    assert.throws(() => validateTemplateVariables("crs_alert", {
-      MESSAGE: "Sign in to view",
-      CLIENT_REFERENCE: "x".repeat(129),
-    }));
-  });
-});
-
-describe("email payload hygiene", () => {
-  it("copies only the fixed sentence and client reference from a poisoned row", () => {
-    const row = Object.freeze({
-      client_id: "82000000-0000-4000-8000-000000000101",
-      alert_type: "private-alert",
-      bureau_value: "private-value",
-      nested: { confidential: true },
-      recipient_profile_id: "private-profile",
-    });
-    const output = buildCrsAlertPayload(row);
-    assert.deepEqual(output, {
-      MESSAGE: "Sign in to view",
-      CLIENT_REFERENCE: "82000000-0000-4000-8000-000000000101",
-    });
-    assert.equal(JSON.stringify(output).includes("private"), false);
-    assert.ok(Object.isFrozen(output));
   });
 });
 
@@ -149,15 +124,5 @@ describe("consumer event email templates", () => {
         /EMAIL_TEMPLATE_VARS_INVALID/,
       );
     }
-  });
-
-  it("has no delivery reference for the unpublished generic builder", () => {
-    assert.throws(
-      () => deliveryReference("crs_alert", {
-        MESSAGE: "Sign in to view",
-        CLIENT_REFERENCE: "82000000-0000-4000-8000-000000000101",
-      }),
-      /EMAIL_TEMPLATE_UNPUBLISHED/,
-    );
   });
 });

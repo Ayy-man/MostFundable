@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { describe, it } from "node:test";
 
 import { stripComments } from "@/lib/testing/strip-comments";
+import { CONSUMER_NOTIFICATION_EMAIL_TEMPLATES } from "@/lib/notifications/email-dispatch";
 import { EMAIL_TEMPLATE_REGISTRY } from "./templates.ts";
 
 const WEB_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -32,54 +33,37 @@ const source = (path: string) => stripComments(readFileSync(path, "utf8"));
 const named = (path: string) => relative(WEB_ROOT, path).replaceAll("\\", "/");
 
 describe("email matrix", () => {
-  it("freezes the three approved owners and the application templates", () => {
-    const registry = source(join(SRC_ROOT, "lib/email/templates.ts"));
-    const owned = [
-      { owner: "supabase", events: ["auth", "invites"] },
-      { owner: "stripe", events: ["receipts"] },
-      {
-        owner: "application-email",
-        events: [
-          "operator_card_failure",
-          "consumer_monitoring_alert",
-          "consumer_stage_change",
-          "consumer_analysis_complete",
-          "consumer_refresh_result",
-          "consumer_enrollment_milestone",
-          "consumer_document",
-          "consumer_team_message",
-          "consumer_application_update",
-        ],
-      },
-    ];
-    // The list above is the frozen matrix; the registry is read back against it so a tenth
-    // application template cannot be published without amending this test.
-    assert.deepEqual(
-      Object.values(EMAIL_TEMPLATE_REGISTRY)
-        .filter((definition) => definition.providerTemplate !== null)
-        .map((definition) => definition.template)
-        .sort(),
-      [...owned[2].events].sort(),
-    );
-    assert.equal(registry.includes("crs_alert"), true, "the unpublished builder still exists");
-    assert.deepEqual(owned, [
-      { owner: "supabase", events: ["auth", "invites"] },
-      { owner: "stripe", events: ["receipts"] },
-      {
-        owner: "application-email",
-        events: [
-          "operator_card_failure",
-          "consumer_monitoring_alert",
-          "consumer_stage_change",
-          "consumer_analysis_complete",
-          "consumer_refresh_result",
-          "consumer_enrollment_milestone",
-          "consumer_document",
-          "consumer_team_message",
-          "consumer_application_update",
-        ],
-      },
+  it("gives every declared application template one product sender and a provider contract", () => {
+    const operatorDispatcher = source(join(SRC_ROOT, "lib/email/dispatch.ts"));
+    const consumerDispatcher = source(join(SRC_ROOT, "lib/notifications/email-dispatch.ts"));
+    const consumerTemplates = Object.values(CONSUMER_NOTIFICATION_EMAIL_TEMPLATES);
+    const senderByTemplate = new Map<string, string>([
+      ["operator_card_failure", "src/lib/email/dispatch.ts"],
+      ...consumerTemplates.map((template) => [template, "src/lib/notifications/email-dispatch.ts"] as const),
     ]);
+
+    assert.equal(
+      (operatorDispatcher.match(/dependencies\.driver\.send\(\{[\s\S]*?template:\s*"operator_card_failure"/) ?? []).length,
+      1,
+    );
+    assert.equal(
+      (consumerDispatcher.match(/dependencies\.driver\(\)\.send\(\{/) ?? []).length,
+      1,
+    );
+    assert.equal(new Set(consumerTemplates).size, consumerTemplates.length);
+    assert.deepEqual(
+      [...senderByTemplate.keys()].sort(),
+      Object.keys(EMAIL_TEMPLATE_REGISTRY).sort(),
+    );
+    assert.equal(senderByTemplate.size, Object.keys(EMAIL_TEMPLATE_REGISTRY).length);
+    for (const definition of Object.values(EMAIL_TEMPLATE_REGISTRY)) {
+      if (
+        typeof definition.providerTemplate !== "string"
+        || definition.providerTemplate.length === 0
+      ) {
+        assert.fail(`${definition.template} lacks a provider template`);
+      }
+    }
   });
 
   it("has one billing enqueue edge and exactly two driver-send edges", () => {
@@ -135,17 +119,12 @@ describe("email matrix", () => {
     assert.doesNotMatch(dispatcher, /\bthrow\b/);
   });
 
-  it("keeps crs_alert as a non-wired generic builder", () => {
-    const templates = source(join(SRC_ROOT, "lib/email/templates.ts"));
-    const enqueue = source(join(SRC_ROOT, "lib/email/enqueue.ts"));
-    const billing = source(join(SRC_ROOT, "lib/billing/service-operator.ts"));
-    const notifications = source(join(SRC_ROOT, "lib/ancillary/notifications.ts"));
+  it("routes a CRS alert to the consumer monitoring-alert template", () => {
+    const serverDispatcher = source(join(SRC_ROOT, "lib/notifications/email-dispatch.server.ts"));
+    const consumerDispatcher = source(join(SRC_ROOT, "lib/notifications/email-dispatch.ts"));
 
-    assert.match(templates, /providerTemplate:\s*null/);
-    assert.match(templates, /MESSAGE:\s*"Sign in to view"/);
-    assert.match(templates, /CLIENT_REFERENCE:\s*clientReference/);
-    assert.doesNotMatch(enqueue, /crs_alert/);
-    assert.doesNotMatch(billing, /crs_alert/);
-    assert.doesNotMatch(notifications, /crs_alert/);
+    assert.match(serverDispatcher, /crs_alert:\s*"monitoring_alert"/);
+    assert.match(consumerDispatcher, /monitoring_alert:\s*"consumer_monitoring_alert"/);
+    assert.equal(Object.hasOwn(EMAIL_TEMPLATE_REGISTRY, "crs_alert"), false);
   });
 });

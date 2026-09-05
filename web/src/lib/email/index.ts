@@ -5,7 +5,6 @@ export { createEmailReceiptRepository } from "./repository.ts";
 export {
   CONSUMER_EMAIL_TEMPLATES,
   EMAIL_TEMPLATE_REGISTRY,
-  buildCrsAlertPayload,
   buildProviderVariables,
   deliveryReference,
   isConsumerEmailTemplate,

@@ -15,7 +15,7 @@ export type ConsumerEmailTemplate =
   | "consumer_team_message"
   | "consumer_application_update";
 
-export type EmailTemplate = "operator_card_failure" | "crs_alert" | ConsumerEmailTemplate;
+export type EmailTemplate = "operator_card_failure" | ConsumerEmailTemplate;
 
 /** Every consumer template's variable shape. Identical by design: the template is the content. */
 export type ConsumerEmailTemplateVars = Readonly<{
@@ -31,10 +31,6 @@ type ConsumerEmailTemplateVarMap = {
 export interface EmailTemplateVars extends ConsumerEmailTemplateVarMap {
   readonly operator_card_failure: Readonly<{
     DELIVERY_REFERENCE: string;
-  }>;
-  readonly crs_alert: Readonly<{
-    MESSAGE: "Sign in to view";
-    CLIENT_REFERENCE: string;
   }>;
 }
 

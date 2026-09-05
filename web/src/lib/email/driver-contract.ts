@@ -42,8 +42,8 @@ function supportedRequest(): EmailSendInput<"operator_card_failure"> {
     ],
     "the email catalog changed its published-template set without updating the driver contract",
   );
-  // Every driver must carry the operator template; consumer templates only reach the resend
-  // driver, which the consumer dispatcher gates on, so the shared contract stays on this one.
+  // The common receipt contract uses the operator template; mock coverage below exercises every
+  // catalog template against the same published-template boundary as Resend.
   const definition = EMAIL_TEMPLATE_REGISTRY.operator_card_failure;
   assert.deepEqual(definition.internalKeys, ["DELIVERY_REFERENCE"]);
   return {
