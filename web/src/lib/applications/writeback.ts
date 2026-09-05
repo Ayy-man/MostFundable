@@ -25,6 +25,10 @@ import type {
   VaultWritebackDriver,
 } from "./ports.ts";
 import type { VaultWritebackRow } from "./types.ts";
+import {
+  VAULT_OUTCOME_DESTINATION,
+  payloadSatisfiesVaultDescriptor,
+} from "./vault-writeback-schema.ts";
 
 /**
  * A configuration gap and a transport failure are different facts and the
@@ -34,6 +38,7 @@ import type { VaultWritebackRow } from "./types.ts";
  */
 export const WRITEBACK_CONFIGURATION_FAILURE = "configuration_error";
 export const WRITEBACK_TRANSPORT_FAILURE = "transport";
+export const WRITEBACK_SCHEMA_FAILURE = "schema_error";
 
 /**
  * The narrowest slice of a Supabase client this arm uses. Declaring it here
@@ -118,29 +123,69 @@ const defaultCreateClient: VaultClientFactory = async (url, serviceKey) => {
 /**
  * Deliver one outbox row to the CCA VAULT.
  *
- * The two target tables come from `docs/backend/CURRENT-STATE.md:44` and are
- * marked `UNVERIFIED-FOR-ACCOUNT` in `.planning/pre-flight/phase-11.md` P-08
- * (checked 2026-08-16): no project-scoped VAULT read key exists on this side,
- * so no column list, no nullability and no `source` column has been read from
- * the live schema. This arm is written against the table names only.
+ * The live VAULT schema was read through its PostgREST OpenAPI description on
+ * 2026-09-05. It contains both historic names: `data_points` has non-null
+ * `bank_id` (a Vault UUID), so it cannot accept an outbox row identified only
+ * by `bank_ref`; `bank_datapoints` has generated `id` plus non-null
+ * `bank_slug` and `dp_type`, with nullable `date_observed` and integer
+ * `amount`. This arm sends only to `bank_datapoints` and its descriptor records
+ * all observed columns and nullability.
  *
- * The row's `payload` is inserted verbatim. It is the object
- * `private.vault_writeback_payload_valid(jsonb)` already accepted, so its key
- * set is the single gate on what leaves this system (T-11-18); adding a field
- * here would route around that gate. If the real schema rejects the insert, the
- * result is `transport` and the outbox row stays for a replay.
+ * `private.vault_writeback_payload_valid(jsonb)` admits only `bank_ref`,
+ * `outcome_kind`, `decided_on`, optional `amount_cents`, and optional
+ * `stats_version`. The mapper translates the first three to the live column
+ * names and converts whole-dollar cents to `amount`; no destination exists for
+ * `stats_version`. A fractional-dollar amount is retained in the outbox with a
+ * schema error instead of being rounded. The owner still needs to confirm the
+ * Vault team's `dp_type` vocabulary, amount unit and provenance/version policy
+ * before enabling a real delivery.
  *
- * Verifying the shape against the live schema is key-arrival work — KA-11-1 in
- * `.planning/lanes/phase-11.md` — and until then this path reports SKIPPED.
  */
+export function buildVaultWritebackInsert(
+  row: VaultWritebackRow,
+): Record<string, unknown> | null {
+  if (row.target !== VAULT_OUTCOME_DESTINATION) return null;
+
+  const bankSlug = row.payload.bank_ref;
+  const dpType = row.payload.outcome_kind;
+  const dateObserved = row.payload.decided_on;
+  const amountCents = row.payload.amount_cents;
+
+  if (
+    typeof bankSlug !== "string"
+    || typeof dpType !== "string"
+    || typeof dateObserved !== "string"
+    || (amountCents !== undefined && amountCents !== null
+      && (typeof amountCents !== "number"
+        || !Number.isSafeInteger(amountCents)
+        || amountCents % 100 !== 0))
+  ) return null;
+
+  const values: Record<string, unknown> = {
+    bank_slug: bankSlug,
+    dp_type: dpType,
+    date_observed: dateObserved,
+  };
+  if (typeof amountCents === "number") values.amount = amountCents / 100;
+
+  return payloadSatisfiesVaultDescriptor(VAULT_OUTCOME_DESTINATION, values)
+    ? values
+    : null;
+}
+
 async function deliverToVault(
   row: VaultWritebackRow,
   arm: { url: string; serviceKey: string },
   createClient: VaultClientFactory,
 ): Promise<VaultWritebackDeliveryResult> {
+  const payload = buildVaultWritebackInsert(row);
+  if (payload === null) {
+    return { state: "recorded", failureCode: WRITEBACK_SCHEMA_FAILURE };
+  }
+
   try {
     const client = await createClient(arm.url, arm.serviceKey);
-    const { error } = await client.from(row.target).insert(row.payload);
+    const { error } = await client.from(VAULT_OUTCOME_DESTINATION).insert(payload);
     if (error) {
       return { state: "failed", failureCode: WRITEBACK_TRANSPORT_FAILURE };
     }

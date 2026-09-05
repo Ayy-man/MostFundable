@@ -132,7 +132,7 @@ test("every value list matches its union exhaustively", () => {
     ],
     [OUTCOME_JOB_STATUS_VALUES satisfies readonly OutcomeJobStatus[], 4],
     [VAULT_WRITEBACK_STATE_VALUES satisfies readonly VaultWritebackState[], 3],
-    [VAULT_WRITEBACK_TARGET_VALUES satisfies readonly VaultWritebackTarget[], 2],
+    [VAULT_WRITEBACK_TARGET_VALUES satisfies readonly VaultWritebackTarget[], 1],
     [BANK_HEAT_LEVEL_VALUES satisfies readonly BankHeatLevel[], 3],
     [APPLICATIONS_ERROR_CODES satisfies readonly ApplicationsErrorCode[], 8],
   ];
