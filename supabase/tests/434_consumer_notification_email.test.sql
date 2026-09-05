@@ -137,18 +137,21 @@ select is(
   'the in-app delivery row is the only row a consumer email can hang off'
 );
 
+-- Claim in its own statement first: a row inserted by a volatile function is not visible to
+-- a table scan in the same statement, so reading the receipt inline would always see nothing.
+create temporary table first_claim as
+select claimed.receipt_id
+from public.claim_email_delivery(
+  (select delivery_id from email_fixture),
+  'consumer_monitoring_alert',
+  ' Consumer@Notification-Email.Test '
+) as claimed;
+
 select is(
   (
     select receipt.org_id
     from public.email_outbox as receipt
-    where receipt.id = (
-      select claimed.receipt_id
-      from public.claim_email_delivery(
-        (select delivery_id from email_fixture),
-        'consumer_monitoring_alert',
-        ' Consumer@Notification-Email.Test '
-      ) as claimed
-    )
+    where receipt.id = (select receipt_id from first_claim)
   ),
   '43400000-0000-4000-8000-000000000001'::uuid,
   'the receipt takes its tenant from the client behind the in-app delivery row'

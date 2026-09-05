@@ -109,8 +109,8 @@ select is(
       and in_app_enabled
       and not email_enabled
   ),
-  16,
-  'every seeded category defaults to in-app on and email off'
+  12,
+  'every seeded category defaults to in-app on; email is off except the two interruptive ones (434)'
 );
 select is(
   (
