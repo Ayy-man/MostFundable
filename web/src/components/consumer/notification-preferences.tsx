@@ -194,11 +194,12 @@ export function ConsumerNotificationPreferences({
                     label={`${meta.label}, in-app ${preference.inApp ? "on" : "off"}`}
                     onChange={() => void change(preference, "inApp")}
                   />
+                  {/* The availability constant stays in the disabled condition: it is the one
+                      switch that turns consumer event email off everywhere if the dispatcher has
+                      to be pulled. */}
                   <ChannelSwitch
                     checked={preference.email}
                     disabled={saving !== null || !CONSUMER_NOTIFICATION_EMAIL_AVAILABLE}
-                    // The constant stays in the condition: it is the one switch that turns consumer
-                    // event email off everywhere if the dispatcher has to be pulled.
                     label={`${meta.label}, email ${preference.email ? "on" : "off"}`}
                     onChange={() => void change(preference, "email")}
                   />
