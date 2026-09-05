@@ -41,7 +41,7 @@ The deployment is running in a deliberate demo configuration. Every item below i
 | C3 | Pull caps are silently not enforced when the ancillary flag is off. | A flag flip removes a spend limit without warning. | Fail closed or log loudly when caps are bypassed. | `web/src/lib/ancillary/pull-caps.ts:19` |
 | C4 | Removed. The unsupported daily analysis schedule job is no longer catalogued or accepted by the background-job queue. | Complete. | No further change. | `web/src/lib/jobs/definitions.ts`; `supabase/migrations/436_remove_analysis_schedule_due_job.sql` |
 | C5 | Human-typed support messages are not checked for banned compliance language. Only AI drafts and shipped copy are. | An operator can type prohibited claims to a client. | Decide whether to add a warning or a block on operator-authored message bodies. | `supabase/migrations/100_support_threads.sql:167-175` covers drafts only |
-| C6 | Manual stage moves have no forward-only rule. An operator can move a client from Onboarding straight to Funded. | Stage reports can be gamed or mis-clicked. | Add an allowed-transition check for manual moves if forward-only is a requirement. | `supabase/migrations/050_tracker_stage_engine.sql:84-256` |
+| C6 | Manual stage moves now allow one stage forward or one stage back for corrections; system-originated moves are unchanged. | Prevents reports being gamed or a client being mis-clicked from Onboarding straight to Funded. | Complete. The RPC raises `stage_transition_not_allowed` with the persisted from/to stages, and the API returns a readable 409. | `supabase/migrations/437_manual_stage_transitions.sql`; `web/src/lib/tracker/transition.server.ts`; `web/src/app/api/clients/[id]/route.ts` |
 
 ## D. Documentation corrections
 
