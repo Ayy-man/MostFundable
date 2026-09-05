@@ -68,6 +68,14 @@ const ADMIN_IMPORTERS = new Set([
   "src/lib/admin/platform.ts",
   "src/lib/admin/prompt-repository.ts",
   "src/lib/admin/settings-repository.ts",
+  // B6's health check reads org and background-job counts with the service-role
+  // client because it runs before any operator session exists; it performs no
+  // writes and answers `false` on an unreachable database.
+  "src/lib/admin/health.ts",
+  // B2's consumer email dispatch runs inside the notifications job, where there
+  // is no session: it reads the notification, the recipient profile and the
+  // recipient's preferences, and writes nothing through this client.
+  "src/lib/notifications/email-dispatch.server.ts",
   "src/lib/ancillary/notification-repository.ts",
   "src/lib/ancillary/repository.ts",
   "src/lib/ancillary/training-source-storage.ts",
