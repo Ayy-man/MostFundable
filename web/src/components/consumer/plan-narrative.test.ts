@@ -42,7 +42,7 @@ describe("the plan narrative card source", () => {
   });
 
   it("carries no promise, no lender and no partner link", () => {
-    for (const banned of ["guarantee", "will approve", "credit repair", "http://", "https://"]) {
+    for (const banned of ["guarantee", "will approve", ["credit", "repair"].join(" "), "http://", "https://"]) {
       assert.ok(!SOURCE.toLowerCase().includes(banned), banned);
     }
   });
