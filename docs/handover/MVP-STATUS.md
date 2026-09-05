@@ -20,11 +20,13 @@ Passing source checks proves the included mechanism and its automated coverage. 
 
 - Establish and prove production payment processing.
 - Establish and prove product email delivery.
-- Establish and prove live credit-data operations.
-- Prove end-to-end privacy erasure; current source proves request intake and queue handling.
+- Live credit-data operations are proven against the CRS sandbox (`npm run verify:crs-sandbox`: identity, link, verify, close). Production-host proof still needs the production webhook registered.
+- Privacy erasure is proven end to end against a local stack (real auth provider, real storage bucket, database completion): run `npm run verify:privacy-erasure` in `web/` with `supabase start` up. Production evidence still needs one run against the hosted project.
 - Record monitoring, recovery, and account-ownership evidence.
 - Complete production workflow checks for changed high-impact operations.
 - Record the agreed walkthroughs and acceptance.
+
+The itemised register of demo-mode behaviours, build gaps, code defects and owner inputs is in [PRE-LAUNCH-FIXES.md](PRE-LAUNCH-FIXES.md). Demo testing continues with those items open.
 
 ## Use of this document
 
