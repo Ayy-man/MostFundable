@@ -69,6 +69,20 @@ function smfaStatusAdapter(status: unknown) {
 }
 
 describe('CRS v3 sandbox boundary', () => {
+  it('treats report retrieval as per-request until CRS gives this account a replay guarantee', () => {
+    const adapter = createSandboxAdapter({
+      baseUrl: CRS_SPEC_HOSTS.development.api,
+      apiKey: 'not-a-real-api-key',
+      exposeVerificationUrl: false,
+      secret: 'not-a-real-api-secret',
+      timeoutMs: 1_000,
+    }, dependencies(async () => {
+      throw new Error('report retrieval is not part of this declaration test');
+    }));
+
+    assert.equal(adapter.pullBilling, 'per-request');
+  });
+
   it('normalizes scores, identity, delinquency comments, and the 45-day inquiry match without account numbers', () => {
     const pulledAt = '2026-09-05T00:00:00.000Z';
     const body = normalizeReportBody({ providerViews: [{

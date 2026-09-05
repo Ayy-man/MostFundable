@@ -389,7 +389,9 @@ export function createSandboxAdapter(config: SandboxConfig, deps: SandboxAdapter
 
   return {
     driver: 'sandbox',
-    pullBilling: 'cached-read',
+    // The endpoint is a GET, but it asks CRS to retrieve a report for this member. The contract
+    // does not give this account a replay guarantee, so lease recovery must treat it as billable.
+    pullBilling: 'per-request',
 
     async createMember(identity: CrsIdentity): Promise<CreateMemberResult> {
       const registered = await requestJson('registerUser', CRS_SPEC_PATHS.directUserRegistration, 'POST', await directToken(), {

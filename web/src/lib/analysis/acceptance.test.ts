@@ -445,7 +445,7 @@ describe('Phase 5 rejection and absence boundaries', () => {
     assert.equal(inner.readRuns().length, 0);
   });
 
-  it('keeps source-only values out of every captured downstream surface and emits no logs', async (context) => {
+  it('keeps source-only values out of every captured downstream surface and out of every log line', async (context) => {
     const logs: unknown[][] = [];
     for (const method of ['log', 'info', 'warn', 'error'] as const) {
       context.mock.method(console, method, (...values: unknown[]) => { logs.push(values); });
@@ -459,7 +459,13 @@ describe('Phase 5 rejection and absence boundaries', () => {
     });
     assert.equal(surfaces.includes(SOURCE_CANARY), false);
     assert.equal(surfaces.includes('subjectRef'), false);
-    assert.deepEqual(logs, []);
+    // The only line this path may write is the C3 pull-cap bypass warning, and it carries the client
+    // UUID and the cause: nothing from the report and nothing that names a person.
+    assert.ok(logs.length > 0, 'the flag-off bypass is logged loudly');
+    for (const line of logs) {
+      assert.deepEqual(line, [{ code: 'PULL_CAP_BYPASSED_FLAG_OFF', clientId: CLIENT_ID, cause: 'scheduled' }]);
+    }
+    assert.equal(JSON.stringify(logs).includes(SOURCE_CANARY), false);
   });
 
   it('stays inert behind an absent feature flag after safe singleton selection', async () => {

@@ -446,7 +446,7 @@ describe('analysis queue worker', () => {
     assert.equal(repository.readPlanCount(), 1);
   });
 
-  it('marks a replayed per-request pull indeterminate without an outbound call', async () => {
+  it('does not pull again when a retried per-request job has a completed pull operation', async () => {
     const repository = repositoryFor('clean');
     await enqueue(repository);
     const job = repository.readJobs()[0];
@@ -454,6 +454,11 @@ describe('analysis queue worker', () => {
       clientId: CLIENT_ID,
       analysisRunId: job.analysisRunId,
       reportCodes: ['EQF1001', 'EXP1001', 'TUC3002'],
+    });
+    await repository.recordPullReturned({
+      clientId: CLIENT_ID,
+      analysisRunId: job.analysisRunId,
+      bureaus: ['EQF', 'EXP', 'TUC'],
     });
     let pulls = 0;
     const cached = countedAdapter('clean', { value: 0 });
@@ -474,7 +479,7 @@ describe('analysis queue worker', () => {
       { claimed: 1, succeeded: 0, failed: 1, errorCode: 'pull_indeterminate' },
     );
     assert.equal(pulls, 0);
-    assert.equal(repository.readPullOperations()[0].state, 'indeterminate');
+    assert.equal(repository.readPullOperations()[0].state, 'returned');
     assert.equal(repository.readJobs()[0].errorCode, 'pull_indeterminate');
   });
 

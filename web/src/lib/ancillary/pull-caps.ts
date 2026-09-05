@@ -16,7 +16,10 @@ export async function assertPullAllowed(
   if (!UUID.test(clientId)) throw new Error("PULL_CAP_CLIENT_INVALID");
   if (!CAUSES.includes(cause)) throw new Error("PULL_CAP_CAUSE_INVALID");
   if (!UUID.test(sourceId)) throw new Error("PULL_CAP_SOURCE_INVALID");
-  if (!featureFlag("FEATURE_ANCILLARY", options.env ?? process.env)) return { allowed: true };
+  if (!featureFlag("FEATURE_ANCILLARY", options.env ?? process.env)) {
+    console.warn({ code: "PULL_CAP_BYPASSED_FLAG_OFF", clientId, cause });
+    return { allowed: true };
+  }
   const result = await (options.repository ?? createSupabaseAncillaryRepository()).assertPullAllowed(clientId, cause, sourceId);
   if (result.allowed && result.reason === null) return { allowed: true };
   if (!result.allowed && (result.reason === "minimum_interval" || result.reason === "count_window")) return { allowed: false, reason: result.reason };
