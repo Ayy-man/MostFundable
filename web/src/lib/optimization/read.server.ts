@@ -2,7 +2,7 @@ import "server-only";
 
 import { featureFlag } from "@/lib/env";
 
-import { OptimizationDataError, readConsumerOptimizationWith } from "./read.ts";
+import { isMissingColumnError, OptimizationDataError, readConsumerOptimizationWith } from "./read.ts";
 
 import type { SessionProfile } from "@/lib/auth/session";
 import type { ConsumerChecklistStateRow, ConsumerOptimizationSourceV1 } from "./map.ts";
@@ -56,16 +56,47 @@ async function readLatestPlan(
 ): Promise<ConsumerOptimizationSourceV1["plan"]> {
   // Highest version wins. `plans` is append-only per analysis run, so ordering by version rather
   // than created_at keeps two rows written in the same second from resolving arbitrarily.
+  //
+  // The narrative rides the SAME row as the plan body on purpose: it is prose written about that
+  // one plan, so reading it from a second query could pair a narrative with a body from a
+  // different analysis run the moment a worker writes between the two.
+  //
+  // The column list is a `string` rather than a literal, and that is load-bearing rather than
+  // style: the generated database types are regenerated from the migration ledger, so until 435 is
+  // applied `plans.narrative` is not in them and a literal select resolves to a compile error for
+  // a column this code is deliberately prepared to find missing. A widened column list asks the
+  // client for rows instead of asking the type checker about the schema, which is the right
+  // question when the answer is a runtime fallback either way.
+  const columns: string = "body, readiness_score, narrative";
   const { data, error } = await db
     .from("plans")
-    .select("body, readiness_score")
+    .select(columns)
     .eq("client_id", clientId)
     .order("version", { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (error) readFailed(error);
+  if (error) {
+    if (!isMissingColumnError(error, "narrative")) readFailed(error);
+    // Pre-435 database: same row, same predicates, without the column that does not exist. The
+    // property is left OFF the result rather than set to null, so the shape says "not read" and
+    // the guard reaches the same answer either way.
+    const fallback = await db
+      .from("plans")
+      .select("body, readiness_score")
+      .eq("client_id", clientId)
+      .order("version", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (fallback.error) readFailed(fallback.error);
+    if (!fallback.data) return null;
+    return { body: fallback.data.body as unknown, readinessScore: fallback.data.readiness_score };
+  }
   if (!data) return null;
-  return { body: data.body as unknown, readinessScore: data.readiness_score };
+  // A widened column list gives up the generated row type with it, so the three columns this
+  // query names are re-stated here. `body` and `narrative` stay `unknown` — both are jsonb and
+  // both are guarded downstream — and nothing else on the row is reachable through this shape.
+  const row = data as unknown as { body: unknown; narrative?: unknown; readiness_score: number };
+  return { body: row.body, narrative: row.narrative, readinessScore: row.readiness_score };
 }
 
 async function readLatestRun(

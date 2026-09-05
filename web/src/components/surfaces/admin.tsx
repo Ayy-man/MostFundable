@@ -48,7 +48,7 @@ import {
   Panel,
   StatusPill,
 } from "@/components/demo/shared";
-import { BrandSelect } from "@/components/ui/brand-select";
+import { BrandSelect, type BrandSelectProps } from "@/components/ui/brand-select";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -107,6 +107,7 @@ import {
 } from "@/lib/admin/client";
 import { KPI_METRIC_KEYS } from "@/lib/admin/analytics-types";
 import { GOVERNED_SETTING_KEYS } from "@/lib/admin/settings-types";
+import { promptFamilyOptions, promptKeyLabel } from "@/lib/admin/prompt-labels";
 import { MANDATORY_PROMPT_EVALUATORS } from "@/lib/admin/prompt-types";
 import type { KpiMetricKey, KpiRollupRow } from "@/lib/admin/analytics-types";
 import type { EvalRunRow, PromptKey, PromptVersionRow } from "@/lib/admin/prompt-types";
@@ -444,7 +445,10 @@ function AdminSelect({
   ariaLabel: string;
   className?: string;
   onChange: (value: string) => void;
-  options: string[];
+  // Widened from `string[]` to the combobox's own option type so a call site whose values are
+  // identifiers can pass `{ value, label }` and show the human wording instead. Every existing
+  // caller keeps passing a plain string array, which still means "the value is its own label".
+  options: BrandSelectProps["options"];
   value: string;
 }) {
   // Every admin filter and form picker routes through the one shared combobox,
@@ -2651,12 +2655,12 @@ function GovernedPromptsSection() {
   const activeVersion = versions.find((version) => version.active);
   return (
     <div className="space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center"><AdminSelect ariaLabel="Prompt family" onChange={(value) => { setState("loading"); setSelected(value as PromptKey); }} options={["funding-readiness-plan", "support-draft"]} value={selected} /><span className="text-xs text-muted-foreground">{activeVersion ? `Stored version ${activeVersion.version} active` : "Embedded code-v1 fallback active"}</span></div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center"><AdminSelect ariaLabel="Prompt family" onChange={(value) => { setState("loading"); setSelected(value as PromptKey); }} options={promptFamilyOptions()} value={selected} /><span className="text-xs text-muted-foreground">{activeVersion ? `Stored version ${activeVersion.version} active` : "Embedded code-v1 fallback active"}</span></div>
       {state === "loading" ? <Panel title="Loading prompts"><span /></Panel> : null}
       {state === "disabled" ? <Notice>{ADMIN_GOVERNANCE_ABSENT}</Notice> : state === "error" ? <Notice tone="warning">Prompt history could not be loaded.</Notice> : null}
       {note ? <Notice>{note}</Notice> : null}
       {state === "ready" ? <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
-        <Panel title={selected} description={activeVersion ? `Editing from stored version ${activeVersion.version}` : "Editing from the embedded fallback"}>
+        <Panel title={promptKeyLabel(selected)} description={activeVersion ? `Editing from stored version ${activeVersion.version}` : "Editing from the embedded fallback"}>
           <Textarea aria-label="Governed prompt body" className="min-h-[24rem] font-mono text-xs leading-6" onChange={(event) => setDraft(event.target.value)} value={draft} />
           <div className="mt-4 flex justify-end"><Button onClick={() => void append()}>Append version</Button></div>
         </Panel>

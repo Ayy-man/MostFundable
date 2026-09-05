@@ -29,6 +29,7 @@ function view(personal: FactorV1[], business: FactorV1[], overrides: Partial<Con
     analysis: { bureausPulled: ["EQF"], ranAt: "2026-08-15T00:00:00Z", trigger: "enrollment" },
     clientId: "c",
     estimatedCompletion: { days: null, label: "TBD" },
+    narrative: null,
     provenance: "plan",
     readiness: 58,
     readinessLabel: "Optimization",
