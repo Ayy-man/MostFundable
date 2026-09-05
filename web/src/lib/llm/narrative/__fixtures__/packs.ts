@@ -47,6 +47,9 @@ export function tinyPack(): FactsPackV2 {
         ageMonths: 48,
         lateWithin24Months: false,
         pastDueCents: 0,
+        // 29% of the $5,000 limit, floored to the dollar, and what has to come off to reach it.
+        targetBalanceCents: 145_000,
+        paydownCents: 275_000,
       },
     ],
     inquiries: [],
@@ -115,10 +118,10 @@ export function maxedCardsPack(): FactsPackV2 {
       { key: 'business_website_present', state: 'not_checkable', observed: {}, target: 'supplied by the owner', gap: null },
     ],
     accounts: [
-      { accountRef: 'account-1', label: 'STORE CARD', kind: 'revolving', isOpen: true, isNegative: false, balanceCents: 103_000, limitCents: 100_000, utilizationPct: 103, ageMonths: 11, lateWithin24Months: true, pastDueCents: 4_500 },
-      { accountRef: 'account-2', label: 'CREDIT UNION VISA', kind: 'revolving', isOpen: true, isNegative: false, balanceCents: 332_500, limitCents: 350_000, utilizationPct: 95, ageMonths: 22, lateWithin24Months: false, pastDueCents: 0 },
-      { accountRef: 'account-3', label: 'GAS CARD', kind: 'revolving', isOpen: true, isNegative: false, balanceCents: 48_000, limitCents: 60_000, utilizationPct: 80, ageMonths: 9, lateWithin24Months: true, pastDueCents: 3_200 },
-      { accountRef: 'account-4', label: 'AUTO LOAN', kind: 'installment', isOpen: true, isNegative: false, balanceCents: 1_840_000, limitCents: null, utilizationPct: null, ageMonths: 14, lateWithin24Months: false, pastDueCents: 0 },
+      { accountRef: 'account-1', label: 'STORE CARD', kind: 'revolving', isOpen: true, isNegative: false, balanceCents: 103_000, limitCents: 100_000, utilizationPct: 103, ageMonths: 11, lateWithin24Months: true, pastDueCents: 4_500, targetBalanceCents: 28_900, paydownCents: 74_100 },
+      { accountRef: 'account-2', label: 'CREDIT UNION VISA', kind: 'revolving', isOpen: true, isNegative: false, balanceCents: 332_500, limitCents: 350_000, utilizationPct: 95, ageMonths: 22, lateWithin24Months: false, pastDueCents: 0, targetBalanceCents: 101_500, paydownCents: 231_000 },
+      { accountRef: 'account-3', label: 'GAS CARD', kind: 'revolving', isOpen: true, isNegative: false, balanceCents: 48_000, limitCents: 60_000, utilizationPct: 80, ageMonths: 9, lateWithin24Months: true, pastDueCents: 3_200, targetBalanceCents: 17_400, paydownCents: 30_600 },
+      { accountRef: 'account-4', label: 'AUTO LOAN', kind: 'installment', isOpen: true, isNegative: false, balanceCents: 1_840_000, limitCents: null, utilizationPct: null, ageMonths: 14, lateWithin24Months: false, pastDueCents: 0, targetBalanceCents: null, paydownCents: null },
     ],
     inquiries: [
       { inquiryRef: 'inquiry-1', bureau: 'EQF', monthsAgo: 2, matchedNewAccountWithin45Days: true },

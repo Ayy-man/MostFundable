@@ -43,9 +43,9 @@ const MIXED_FILE: FactsPackV2 = Object.freeze({
     { key: 'business_website_present', state: 'not_checkable', observed: {}, target: 'supplied by the owner', gap: null },
   ] as const),
   accounts: Object.freeze([
-    { accountRef: 'account-1', label: 'RETAIL CARD', kind: 'revolving', isOpen: true, isNegative: false, balanceCents: 420_000, limitCents: 500_000, utilizationPct: 84, ageMonths: 48, lateWithin24Months: false, pastDueCents: 0 },
-    { accountRef: 'account-2', label: 'CREDIT UNION CARD', kind: 'revolving', isOpen: true, isNegative: false, balanceCents: 30_000, limitCents: 1_200_000, utilizationPct: 3, ageMonths: 26, lateWithin24Months: false, pastDueCents: 0 },
-    { accountRef: 'account-3', label: 'AUTO LOAN', kind: 'installment', isOpen: true, isNegative: false, balanceCents: 980_000, limitCents: null, utilizationPct: null, ageMonths: 24, lateWithin24Months: true, pastDueCents: 21_500 },
+    { accountRef: 'account-1', label: 'RETAIL CARD', kind: 'revolving', isOpen: true, isNegative: false, balanceCents: 420_000, limitCents: 500_000, utilizationPct: 84, ageMonths: 48, lateWithin24Months: false, pastDueCents: 0, targetBalanceCents: 145_000, paydownCents: 275_000 },
+    { accountRef: 'account-2', label: 'CREDIT UNION CARD', kind: 'revolving', isOpen: true, isNegative: false, balanceCents: 30_000, limitCents: 1_200_000, utilizationPct: 3, ageMonths: 26, lateWithin24Months: false, pastDueCents: 0, targetBalanceCents: 348_000, paydownCents: 0 },
+    { accountRef: 'account-3', label: 'AUTO LOAN', kind: 'installment', isOpen: true, isNegative: false, balanceCents: 980_000, limitCents: null, utilizationPct: null, ageMonths: 24, lateWithin24Months: true, pastDueCents: 21_500, targetBalanceCents: null, paydownCents: null },
   ] as const),
   inquiries: Object.freeze([
     { inquiryRef: 'inquiry-1', bureau: 'EXP', monthsAgo: 3, matchedNewAccountWithin45Days: false },
@@ -97,7 +97,7 @@ const CLEAN_FILE: FactsPackV2 = Object.freeze({
     { key: 'business_website_present', state: 'verified', observed: {}, target: 'supplied by the owner', gap: null },
   ] as const),
   accounts: Object.freeze([
-    { accountRef: 'account-1', label: 'CREDIT UNION CARD', kind: 'revolving', isOpen: true, isNegative: false, balanceCents: 225_000, limitCents: 2_500_000, utilizationPct: 9, ageMonths: 96, lateWithin24Months: false, pastDueCents: 0 },
+    { accountRef: 'account-1', label: 'CREDIT UNION CARD', kind: 'revolving', isOpen: true, isNegative: false, balanceCents: 225_000, limitCents: 2_500_000, utilizationPct: 9, ageMonths: 96, lateWithin24Months: false, pastDueCents: 0, targetBalanceCents: 725_000, paydownCents: 0 },
   ] as const),
   inquiries: Object.freeze([]),
   scores: Object.freeze([

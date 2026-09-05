@@ -177,6 +177,39 @@ describe('narrative grounding checker', () => {
     });
   });
 
+  describe('the precomputed paydown figures', () => {
+    it('grounds the target and the paydown a step is told to name', () => {
+      // tinyPack's card: $4,200 on a $5,000 limit, so 29% is $1,450 and $2,750 has to come off.
+      const narrative = groundedNarrative({
+        nextSteps: [{
+          title: 'Bring the card down',
+          detail: 'Pay $2,750 to reach a $1,450 balance, which clears the 30% target.',
+          itemKey: 'utilization_under_30',
+        }],
+      });
+      assert.deepEqual(checkNarrative(narrative, tinyPack()).codes, []);
+    });
+
+    it('still refuses the arithmetic the pack did not do', () => {
+      // The eval's failure mode: a plausible target the rules never chose. $1,500 is 30% of the
+      // limit rather than 29%, and it is nowhere in the pack, so it reads as invented — which is
+      // exactly right, because a consumer paying to $1,500 lands on 30.0% and fails the item.
+      const narrative = groundedNarrative({
+        nextSteps: [{ title: 'Bring the card down', detail: 'Pay it to $1,500.', itemKey: 'utilization_under_30' }],
+      });
+      assert.deepEqual(checkNarrative(narrative, tinyPack()).codes, ['NUMBER_UNGROUNDED']);
+    });
+
+    it('grounds nothing extra for an account with no limit', () => {
+      const pack = packWith({
+        accounts: [{ ...tinyPack().accounts[0], limitCents: null, utilizationPct: null, targetBalanceCents: null, paydownCents: null }],
+      });
+      const allowed = allowedNumbers(pack);
+      assert.equal(allowed.has('1450'), false, 'no target where there is no limit');
+      assert.equal(allowed.has('2750'), false, 'and no paydown either');
+    });
+  });
+
   describe('LANGUAGE', () => {
     it('refuses copy that trips the shared compliance vocabulary', () => {
       const narrative = groundedNarrative({

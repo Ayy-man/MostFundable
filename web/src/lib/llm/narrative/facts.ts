@@ -51,8 +51,22 @@ function personalFact(features: DerivedFeatures, key: PersonalItemKeyV2, plan: F
 }
 
 /** The narrative boundary: only this bounded, identifier-free projection reaches a model. */
+/**
+ * The under-30% target for one card, and the distance to it, both in whole dollars of cents.
+ *
+ * Whole dollars because that is the unit the narrative speaks in — `serializeFactsPack` divides
+ * every `…Cents` key by 100 before the model sees it, and a target of $1,499.50 would render as
+ * $1,500 and stop being the number that clears the item. Flooring to the dollar keeps the rendered
+ * figure true: pay the amount the narrative names and the card is under the target, not on it.
+ */
+function paydown(balanceCents: number, limitCents: number | null): { targetBalanceCents: number | null; paydownCents: number | null } {
+  if (limitCents === null || limitCents <= 0) return { targetBalanceCents: null, paydownCents: null };
+  const targetBalanceCents = Math.floor((limitCents * 0.29) / 100) * 100;
+  return { targetBalanceCents, paydownCents: Math.max(0, balanceCents - targetBalanceCents) };
+}
+
 export function buildFactsPack(features: DerivedFeatures, plan: FundingReadinessPlanV1): FactsPackV2 {
   const personal = PERSONAL_CHECKLIST_V1.map((seed) => personalFact(features, seed.key as PersonalItemKeyV2, plan));
   const business = BUSINESS_CHECKLIST_V1.map((seed) => ({ key: seed.key, state: 'not_checkable' as const, observed: {}, target: seed.title, gap: null }));
-  return { schemaVersion: 2, computedAt: features.computedAt, bureausPulled: features.bureausPulled, readinessScore: plan.readinessScore, readinessLabel: plan.readinessLabel, itemsToFix: itemsToFix(features), personalVerifiedCount: personalVerifiedCount(features), personal, business, accounts: features.accounts.map((account) => ({ accountRef: account.accountRef, label: account.label ?? null, kind: account.kind, isOpen: account.isOpen, isNegative: account.isNegative, balanceCents: account.balanceCents, limitCents: account.limitCents, utilizationPct: account.utilizationPct, ageMonths: account.ageMonths, lateWithin24Months: account.lateWithin24Months ?? false, pastDueCents: account.pastDueCents ?? 0 })), inquiries: features.inquiries ?? [], scores: features.scores ?? [], identity: features.identity ?? { namesOnFile: null, addressesOnFile: null, employersOnFile: null }, overallUtilizationPct: features.overallUtilizationPct, averageAgeMonths: features.averageAgeMonths, highestRevolvingLimitCents: features.highestRevolvingLimitCents, openAccountsCount: features.accounts.filter((item) => item.isOpen).length, negativesCount: features.negativesCount, inquiriesByBureau: features.inquiriesByBureau };
+  return { schemaVersion: 2, computedAt: features.computedAt, bureausPulled: features.bureausPulled, readinessScore: plan.readinessScore, readinessLabel: plan.readinessLabel, itemsToFix: itemsToFix(features), personalVerifiedCount: personalVerifiedCount(features), personal, business, accounts: features.accounts.map((account) => ({ accountRef: account.accountRef, label: account.label ?? null, kind: account.kind, isOpen: account.isOpen, isNegative: account.isNegative, balanceCents: account.balanceCents, limitCents: account.limitCents, utilizationPct: account.utilizationPct, ageMonths: account.ageMonths, lateWithin24Months: account.lateWithin24Months ?? false, pastDueCents: account.pastDueCents ?? 0, ...paydown(account.balanceCents, account.limitCents) })), inquiries: features.inquiries ?? [], scores: features.scores ?? [], identity: features.identity ?? { namesOnFile: null, addressesOnFile: null, employersOnFile: null }, overallUtilizationPct: features.overallUtilizationPct, averageAgeMonths: features.averageAgeMonths, highestRevolvingLimitCents: features.highestRevolvingLimitCents, openAccountsCount: features.accounts.filter((item) => item.isOpen).length, negativesCount: features.negativesCount, inquiriesByBureau: features.inquiriesByBureau };
 }

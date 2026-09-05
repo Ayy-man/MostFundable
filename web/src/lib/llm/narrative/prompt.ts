@@ -112,6 +112,7 @@ const NARRATIVE_SYSTEM_V1 = [
   '- Fact, target, gap again, for an item with no dollars in it. "Average account age is 18 months, under the 24-month target, and the newest account is what pulls it down."',
   '- Name the actual account and the actual number every time. Never "some accounts" or "high balances".',
   '- Say what to do and what number to hit. "Bring that card down to $1,500 or less to clear the 30% target."',
+  '- A step that lowers a card must use that account\'s own targetBalance and paydown figures from the pack, exactly as given. Never work out a target or a paydown amount yourself, and never subtract one pack number from another: the pack already carries both figures for every card that has a limit.',
   '- Order actions by how much they move the checklist, fastest wins first.',
   '- Where an item cannot be checked yet, say plainly what is missing and who needs to supply it.',
   '- One short paragraph per idea. No filler, no cheerleading, no "great job".',
