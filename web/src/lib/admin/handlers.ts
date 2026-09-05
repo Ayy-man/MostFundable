@@ -8,6 +8,7 @@ import type { DrainJobsResult } from "@/lib/jobs/drainer";
 import type { EmbeddedPrompt, EvalRunRow, PromptActivationDecision, PromptEvaluationSummary, PromptKey, PromptVersionRow, ResolvedPrompt } from "./prompt-types.ts";
 import type { GovernedSettingKey, SettingRow } from "./settings-types.ts";
 import type { AdminLayoutRow, KpiMetricKey, KpiRollupRow } from "./analytics-types.ts";
+import type { AdminHealth } from "./health.ts";
 import type { AdminOverviewCounts } from "./overview.ts";
 import type { AdminFundedVolume, AdminPendingReview, AdminTenantRow } from "./platform.ts";
 
@@ -18,6 +19,7 @@ export interface AdminHandlerDependencies {
   getSetting(key: GovernedSettingKey): Promise<SettingRow | null>;
   setSetting(key: GovernedSettingKey, value: number, actorId: string): Promise<SettingRow>;
   readOverviewCounts(): Promise<AdminOverviewCounts>;
+  readHealth(): Promise<AdminHealth>;
   readFundedCents(): Promise<number | null>;
   readCashCents(): Promise<number>;
   listRollups(subject: string, day: string): Promise<readonly KpiRollupRow[]>;
@@ -45,6 +47,7 @@ const defaults: AdminHandlerDependencies = {
   async getSetting(key) { return (await import("./settings.ts")).getSetting(key); },
   async setSetting(key, value, actorId) { return (await import("./settings.ts")).setSetting(key, value, actorId); },
   async readOverviewCounts() { return (await import("./overview.ts")).readAdminOverviewCounts(); },
+  async readHealth() { return (await import("./health.ts")).readAdminHealth(); },
   async readFundedCents() { return (await import("./overview.ts")).readAdminFundedCents(); },
   async readCashCents() { return (await import("./overview.ts")).readAdminCashCents(); },
   async listRollups(subject, day) { return (await import("./analytics.ts")).listKpiRollups(subject, day); },
@@ -123,6 +126,21 @@ export async function handleOverview(
     const cash = flags.fees ? await deps.readCashCents() : null;
     return adminJson({ operators, consumers, analyses, funded, cash });
   } catch (error) { return adminFailure(error); }
+}
+
+/**
+ * The three checks behind the admin System health panel.
+ *
+ * Gated exactly like the Overview strip: `FEATURE_ADMIN` at the route, then the
+ * `platform_admin` role here, before anything is read. The payload names
+ * services and driver names only — never an environment value, a key or a
+ * provider host — because it lands in a browser.
+ */
+export async function handleHealth(overrides: Partial<AdminHandlerDependencies> = {}): Promise<Response> {
+  const deps = withDefaults(overrides);
+  const session = await authenticate(deps);
+  if (isResponse(session)) return session;
+  try { return adminJson(await deps.readHealth()); } catch (error) { return adminFailure(error); }
 }
 
 export async function handleAnalytics(request: Request, overrides: Partial<AdminHandlerDependencies> = {}): Promise<Response> {

@@ -49,6 +49,16 @@ export type AdminReviewView = {
 
 export type AdminReviewQueue = { enabled: boolean; reviews: readonly AdminReviewView[] };
 
+export const ADMIN_HEALTH_STATUSES = ["ok", "degraded", "unknown"] as const;
+export type AdminHealthStatusView = (typeof ADMIN_HEALTH_STATUSES)[number];
+export type AdminHealthTileView = {
+  id: string;
+  label: string;
+  status: AdminHealthStatusView;
+  detail: string;
+};
+export type AdminHealthView = { tiles: readonly AdminHealthTileView[] };
+
 const record = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 const count = (value: unknown): value is number =>
@@ -114,6 +124,21 @@ export function parseAdminReviewQueue(value: unknown): AdminReviewQueue | null {
     });
   }
   return { enabled: value.enabled, reviews };
+}
+
+/**
+ * The System health payload. The status vocabulary is closed, so a body naming
+ * a fourth state is a failed read rather than a pill the panel cannot colour.
+ */
+export function parseAdminHealth(value: unknown): AdminHealthView | null {
+  if (!record(value) || !Array.isArray(value.tiles)) return null;
+  const tiles: AdminHealthTileView[] = [];
+  for (const row of value.tiles) {
+    if (!record(row) || !text(row.id) || !text(row.label) || !text(row.detail)) return null;
+    if (!ADMIN_HEALTH_STATUSES.includes(row.status as AdminHealthStatusView)) return null;
+    tiles.push({ detail: row.detail, id: row.id, label: row.label, status: row.status as AdminHealthStatusView });
+  }
+  return { tiles };
 }
 
 export async function loadAdminResource<T>(

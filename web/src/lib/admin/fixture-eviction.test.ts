@@ -124,6 +124,24 @@ describe("admin surface: every panel names a source or says it has none", () => 
     assert.equal(CODE.includes("Runs this month"), false);
   });
 
+  /**
+   * The health board reports what this deployment can observe, or says it
+   * cannot. Eleven elements under a permanent "Not monitored" pill was a panel
+   * that could not tell a healthy platform from a broken one, and a fixture
+   * list of element names is not a health check however it is styled.
+   */
+  it("reads System health from the admin health route rather than a fixture list", () => {
+    assert.ok(CODE.includes('useAdminResource("/api/admin/health", parseAdminHealth)'));
+    assert.equal(CODE.includes("HEALTH_ELEMENTS"), false);
+    assert.equal(CODE.includes("Not monitored"), false);
+    // Every unreadable state is named rather than rendered as a green board.
+    for (const reason of [
+      "Checking the platform's health",
+      "The health checks could not be read",
+      "Platform health checks are not enabled on this deployment",
+    ]) assert.ok(CODE.includes(reason), `unnamed health read state: ${reason}`);
+  });
+
   it("takes the platform support queue from the support API", () => {
     assert.ok(CODE.includes('from "@/lib/operator/support-inbox.client"'));
     assert.equal(CODE.includes("SUPPORT_TICKET_FIXTURES"), false);

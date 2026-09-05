@@ -10,6 +10,7 @@ import {
   handleEvalHistory,
   handleEvaluatePrompt,
   handleGetLayout,
+  handleHealth,
   handleOverview,
   handlePatchSetting,
   handlePromptVersions,
@@ -31,6 +32,7 @@ function dependencies(overrides: Partial<AdminHandlerDependencies> = {}): AdminH
       return { key, value, updatedBy: actorId, updatedAt: "2026-08-17T00:00:00.000Z" };
     },
     async readOverviewCounts() { return { operators: 2, consumers: 5, analyses: 9 }; },
+    async readHealth() { return { tiles: [] }; },
     async readFundedCents() { return 4_500_000; },
     async readCashCents() { return 350_000; },
     async listRollups() { return []; },
@@ -162,6 +164,28 @@ describe("admin handler contracts", () => {
     }));
     assert.equal(response.status, 500);
     assert.deepEqual(await body(response), { error: { code: "admin_request_failed" } });
+  });
+
+  it("authenticates before reading system health and refuses without reading it", async () => {
+    const calls: string[] = [];
+    const tiles = [{ detail: "The service-scoped admin client answered a trivial read.", id: "database" as const, label: "Database", status: "ok" as const }];
+    const ok = await handleHealth(dependencies({
+      async requireAdmin() { calls.push("auth"); return { id: ACTOR, role: "platform_admin" }; },
+      async readHealth() { calls.push("health"); return { tiles }; },
+    }));
+    assert.equal(ok.status, 200);
+    assert.deepEqual(calls, ["auth", "health"]);
+    assert.deepEqual(await body(ok), { tiles });
+    assert.equal(ok.headers.get("cache-control"), "private, no-store");
+
+    let read = false;
+    const refused = await handleHealth(dependencies({
+      async requireAdmin() { throw { status: 403 }; },
+      async readHealth() { read = true; return { tiles: [] }; },
+    }));
+    assert.equal(refused.status, 403);
+    assert.equal(read, false);
+    assert.deepEqual(await body(refused), { error: { code: "forbidden" } });
   });
 
   it("constructs only the kpi run-now tuple and rejects a caller-supplied job key", async () => {

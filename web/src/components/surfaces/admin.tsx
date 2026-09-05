@@ -69,7 +69,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { HEALTH_ELEMENTS } from "@/lib/demo/co-fixtures";
 import { readSupportInbox } from "@/lib/operator/support-inbox.client";
 import type { SupportInboxThread } from "@/lib/operator/support-inbox.client";
 import {
@@ -140,12 +139,13 @@ import {
   adminReadReason,
   isAdminReady,
   parseAdminFundedSeries,
+  parseAdminHealth,
   parseAdminReviewQueue,
   parseAdminSaasMetrics,
   parseAdminTenants,
   useAdminResource,
 } from "@/lib/admin/platform-client";
-import type { AdminRead, AdminTenantView } from "@/lib/admin/platform-client";
+import type { AdminHealthStatusView, AdminRead, AdminTenantView } from "@/lib/admin/platform-client";
 import {
   AdminWorkspaceClientError,
   changeAdminWorkspaceLifecycle,
@@ -2429,7 +2429,29 @@ function HeldRepliesSection() {
  * path an operator actually has. It carries no per-element association and no
  * severity, so neither is shown.
  */
-const HEALTH_NOT_MONITORED = "These platform elements have no automated health check. The platform support queue below is the recorded source.";
+/**
+ * What the health panel says about itself.
+ *
+ * It used to list eleven platform elements, every one of them under a "Not
+ * monitored" pill — a health board that reported nothing about the platform's
+ * health and could not tell a healthy deployment from a broken one. The three
+ * checks that replace it are the ones `/api/admin/health` can answer from this
+ * deployment: the admin database, the background job queue, and which services
+ * are still on a mock driver.
+ */
+const HEALTH_DESCRIPTION = "Three live checks read from this deployment: the admin database, the background job queue, and driver selection. The platform support queue below is the recorded ticket source.";
+
+const HEALTH_TONES: Record<AdminHealthStatusView, "success" | "warning" | "neutral"> = {
+  degraded: "warning",
+  ok: "success",
+  unknown: "neutral",
+};
+
+const HEALTH_PILLS: Record<AdminHealthStatusView, string> = {
+  degraded: "Degraded",
+  ok: "OK",
+  unknown: "Unknown",
+};
 
 type AdminSupportRead =
   | { state: "loading" }
@@ -2449,7 +2471,15 @@ function SupportTicketsSection() {
     });
     return () => { active = false; };
   }, []);
-  const healthCategories = Array.from(new Set(HEALTH_ELEMENTS.map((element) => element.category)));
+  const { read: healthRead } = useAdminResource("/api/admin/health", parseAdminHealth);
+  const healthTiles = isAdminReady(healthRead) ? healthRead.tiles : [];
+  const healthReason = healthTiles.length > 0
+    ? null
+    : healthRead === "loading"
+      ? "Checking the platform's health"
+      : healthRead === "failed"
+        ? "The health checks could not be read"
+        : "Platform health checks are not enabled on this deployment";
   const threads = read.state === "ready" ? read.threads : [];
   const openThreadCount = threads.filter((thread) => thread.status !== "resolved").length;
   const queueReason = read.state === "loading"
@@ -2463,24 +2493,22 @@ function SupportTicketsSection() {
   return (
     <Panel
       title="System health"
-      description={HEALTH_NOT_MONITORED}
+      description={HEALTH_DESCRIPTION}
       trailing={read.state === "ready" ? <StatusPill tone={openThreadCount ? "warning" : "success"}>{openThreadCount} open</StatusPill> : null}
     >
-      <div className="grid gap-6 lg:grid-cols-2">
-        {healthCategories.map((category) => (
-          <section key={category}>
-            <h3 className="mb-2 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{category}</h3>
-            <div className="divide-y divide-border">
-              {HEALTH_ELEMENTS.filter((element) => element.category === category).map((element) => (
-                <div className="flex w-full items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0" key={element.id}>
-                  <span className="text-sm font-medium">{element.label}</span>
-                  <StatusPill tone="neutral">Not monitored</StatusPill>
-                </div>
-              ))}
+      {healthReason ? <p className="text-sm leading-6 text-muted-foreground">{healthReason}</p> : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {healthTiles.map((tile) => (
+            <div className="rounded-lg border border-border p-3" key={tile.id}>
+              <div className="flex items-start justify-between gap-3">
+                <span className="text-sm font-medium">{tile.label}</span>
+                <StatusPill tone={HEALTH_TONES[tile.status]}>{HEALTH_PILLS[tile.status]}</StatusPill>
+              </div>
+              <p className="mt-2 text-xs leading-5 text-muted-foreground">{tile.detail}</p>
             </div>
-          </section>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
       <div className="mt-5 border-t border-border pt-4">
         <p className="text-xs font-semibold">Platform support queue</p>
         {queueReason ? <p className="mt-2 text-xs leading-5 text-muted-foreground">{queueReason}</p> : threads.length === 0
