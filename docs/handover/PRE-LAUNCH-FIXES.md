@@ -64,9 +64,10 @@ These are unchanged from ASKS-AND-DECISIONS.md, with two additions found in code
 
 ## Suggested order
 
-Done since the 2026-09-02 measurement: C1, C3, C4, B5, B6 and B7. B2 is built and waits on A4.
+Done since the 2026-09-02 measurement: C1, C2, C3, C4, C5, B4, B5, B6, B7 and B8. B2 is built and waits on A4. The database now runs through migration 439 (438 is C2's paid-invoice evidence; 439 lets the v2 feature extractor persist, which the live-chain check had been failing on).
 
-1. Owner inputs 1 to 3, because A1 to A5, B1, B8, B9 and C2 all wait on them.
+1. Owner inputs 1 to 3, because A1 to A5, A7, B1 and B9 wait on them, and B8 needs the Vault owner to confirm the datapoint vocabulary before one real delivery.
 2. A4 turns on B2 and the card-failure notice together; publish the provider templates before flipping the driver.
 3. B1 before the consumer surface is shown to a paying customer.
-4. A6 last, on the day demo access is retired.
+4. C6 needs a yes or no on forward-only stage moves; the change is built on branch worktree-fix-c6 and reverted off main because the stage-engine test asserts free manual moves.
+5. A6 last, on the day demo access is retired.
