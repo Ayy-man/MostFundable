@@ -66,8 +66,9 @@ These are unchanged from ASKS-AND-DECISIONS.md, with two additions found in code
 
 Done since the 2026-09-02 measurement: C1, C2, C3, C4, C5, B3, B4, B5, B6, B7 and B8. B2 is built for all eight consumer event types and waits on A4. The database now runs through migration 440 (438 is C2's paid-invoice evidence; 439 lets the v2 feature extractor persist, which the live-chain check had been failing on; 440 gives the six derived consumer events a durable notification row so their emails can dispatch).
 
-1. Owner inputs 1 to 3, because A1 to A5, A7, B1 and B9 wait on them, and B8 needs the Vault owner to confirm the datapoint vocabulary before one real delivery.
-2. A4 turns on B2 and the card-failure notice together; publish the provider templates before flipping the driver.
-3. B1 before the consumer surface is shown to a paying customer.
-4. C6 needs a yes or no on forward-only stage moves; the change is built on branch worktree-fix-c6 and reverted off main because the stage-engine test asserts free manual moves.
-5. A6 last, on the day demo access is retired.
+1. Apply migrations 437 to 440 to the hosted Supabase project. Vercel deploys `main` to production on every push (the deploy for the 2026-09-05 pushes is live), and nothing in the repository or CI pushes migrations, so until they are applied the production app calls a validator, two billing RPCs and six notification triggers the hosted database does not have. Without 439 in particular, every production analysis fails at the persistence stage with `ANALYSIS_RESULT_INVALID`, exactly as the CI live chain did before the fix. The repository is not linked to a project locally, so this could not be checked from here.
+2. Owner inputs 1 to 3, because A1 to A5, A7, B1 and B9 wait on them, and B8 needs the Vault owner to confirm the datapoint vocabulary before one real delivery.
+3. A4 turns on B2 and the card-failure notice together; publish the provider templates before flipping the driver.
+4. B1 before the consumer surface is shown to a paying customer.
+5. C6 needs a yes or no on forward-only stage moves; the change is built on branch worktree-fix-c6 and reverted off main because the stage-engine test asserts free manual moves.
+6. A6 last, on the day demo access is retired.
