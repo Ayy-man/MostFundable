@@ -4,7 +4,8 @@
  * It mirrors `llm/engine.ts` deliberately — same prompt resolution when `FEATURE_ADMIN` is on, same
  * two attempts, same `recordEvaluation` dependency writing the evidence a prompt version needs
  * before it can be activated — with one difference that is the whole reason this module exists
- * separately: **it never throws and never fails an analysis.**
+ * separately: **it never throws and never fails an analysis.** The second attempt goes to the
+ * driver's `fallback` when it has one; see `models.ts` for the pair and why.
  *
  * `runPlanEngine` raises `PLAN_REJECTED` and the worker turns that into a failed, retryable job,
  * which is correct for the plan: the plan is the analysis. The narrative is prose about an analysis
@@ -93,9 +94,12 @@ export async function runNarrativeEngine(
   let lastCodes: readonly string[] = [];
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+    // The second attempt goes to the fallback when the driver carries one: a different model
+    // fails on different things, so the pair clears more files than a plain retry would.
+    const writer = attempt === 0 ? driver : driver.fallback ?? driver;
     let candidate: NarrativeV1;
     try {
-      candidate = await driver.write(pack, prompt);
+      candidate = await writer.write(pack, prompt);
     } catch {
       // A transport fault, a truncated body, a schema miss at the provider. Nothing was written, so
       // there is nothing to evaluate; the next attempt is the only remedy and after that, none.
@@ -111,7 +115,7 @@ export async function runNarrativeEngine(
       const groundingCodes = verdict.codes.filter((code) => code !== 'LANGUAGE' && code !== 'LENDER_NAMED');
       const identity = {
         referenceDatasetHash: datasetHash,
-        driver: driver.driver,
+        driver: writer.driver,
         model: candidate.generation.model,
         eligible: false,
       } as const;
@@ -149,6 +153,7 @@ export async function runNarrativeEngine(
     code: lastCodes.includes('NARRATIVE_DRIVER_FAILED') ? 'NARRATIVE_DRIVER_FAILED' : 'NARRATIVE_REJECTED',
     driver: driver.driver,
     model: driver.model,
+    ...(driver.fallback === undefined ? {} : { fallbackModel: driver.fallback.model }),
     promptKey: prompt.key,
     promptVersion: prompt.version,
     attempts: MAX_ATTEMPTS,

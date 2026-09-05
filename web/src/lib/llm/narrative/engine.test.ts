@@ -67,6 +67,41 @@ describe('narrative engine', () => {
     assert.deepEqual(lines, [], 'a recovered attempt is not a failure to log');
   });
 
+  it('sends the second attempt to the fallback driver when the first is refused', async () => {
+    const pack = tinyPack();
+    const primary = scriptedDriver([ungrounded()]);
+    const fallback = scriptedDriver([deriveMockNarrative(pack, 1)]);
+    const { deps, lines } = harness();
+    const narrative = await runNarrativeEngine({ ...primary, fallback }, pack, deps);
+    assert.equal(narrative?.verdict, deriveMockNarrative(pack, 1).verdict);
+    assert.equal(primary.calls, 1);
+    assert.equal(fallback.calls, 1);
+    assert.deepEqual(lines, []);
+  });
+
+  it('sends the second attempt to the fallback driver when the first throws', async () => {
+    const pack = tinyPack();
+    const primary = scriptedDriver([new Error('upstream')]);
+    const fallback = scriptedDriver([deriveMockNarrative(pack, 1)]);
+    const { deps } = harness();
+    const narrative = await runNarrativeEngine({ ...primary, fallback }, pack, deps);
+    assert.ok(narrative);
+    assert.equal(primary.calls, 1);
+    assert.equal(fallback.calls, 1);
+  });
+
+  it('names both models in the line it writes when the pair is exhausted', async () => {
+    const pack = tinyPack();
+    const primary = scriptedDriver([ungrounded()]);
+    const fallback = { ...scriptedDriver([ungrounded()]), model: 'scripted-fallback' };
+    const { deps, lines } = harness();
+    const narrative = await runNarrativeEngine({ ...primary, fallback }, pack, deps);
+    assert.equal(narrative, null);
+    assert.equal(lines.length, 1);
+    assert.equal(lines[0].model, 'scripted');
+    assert.equal(lines[0].fallbackModel, 'scripted-fallback');
+  });
+
   it('returns null after two refusals and logs exactly one line', async () => {
     const pack = tinyPack();
     const driver = scriptedDriver([ungrounded()]);

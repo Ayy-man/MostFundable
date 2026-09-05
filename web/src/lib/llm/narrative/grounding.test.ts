@@ -140,6 +140,26 @@ describe('narrative grounding checker', () => {
       for (const value of ['62', '1', '9', '10']) assert.ok(allowed.has(value), `${value} is grounded`);
     });
 
+    it('lets the timeline reason restate the numbers of the band it chose', () => {
+      // "30-60 days" is a contract enum value, not a model invention, so the reason may say it.
+      const narrative = groundedNarrative({
+        timeline: { band: '30-60 days', reason: 'Paying the card down reports within 30 to 60 days.' },
+      });
+      assert.deepEqual(checkNarrative(narrative, tinyPack()).codes, []);
+    });
+
+    it('refuses band numbers outside the timeline reason, and numbers of a band it did not choose', () => {
+      const elsewhere = groundedNarrative({
+        businessSide: 'The business items usually take 60 days to gather.',
+        timeline: { band: '30-60 days', reason: 'One item is open.' },
+      });
+      assert.deepEqual(checkNarrative(elsewhere, tinyPack()).codes, ['NUMBER_UNGROUNDED']);
+      const otherBand = groundedNarrative({
+        timeline: { band: '7-30 days', reason: 'This can be done within 60 days.' },
+      });
+      assert.deepEqual(checkNarrative(otherBand, tinyPack()).codes, ['NUMBER_UNGROUNDED']);
+    });
+
     it('grounds the small integers a step uses as an ordinal', () => {
       const allowed = allowedNumbers(tinyPack());
       for (const value of ['1', '2', '3']) assert.ok(allowed.has(value), `${value} is grounded`);
@@ -318,6 +338,38 @@ describe('narrative grounding checker', () => {
         nextSteps: [{ title: 'Send the address', detail: 'It is the last open item.', itemKey: 'business_email_present' }],
       });
       assert.deepEqual(checkNarrative(withBusiness, tinyPack()).codes, []);
+    });
+  });
+
+  describe('SCHEMA_LEAKED', () => {
+    it('refuses a checklist key written into the prose', () => {
+      const narrative = groundedNarrative({
+        whereYouStand: 'utilization_under_30 is the one item still open, at 84% against the 30% target.',
+      });
+      assert.deepEqual(checkNarrative(narrative, tinyPack()).codes, ['SCHEMA_LEAKED']);
+    });
+
+    it('refuses the not_checkable state token', () => {
+      const narrative = groundedNarrative({
+        businessSide: 'Every business item is not_checkable until the owner supplies it.',
+      });
+      assert.deepEqual(checkNarrative(narrative, tinyPack()).codes, ['SCHEMA_LEAKED']);
+    });
+
+    it('allows the ordinary words "verified" and "unverified"', () => {
+      // The 2026-09-05 rerun: Sonnet wrote "9 of the 10 items are already verified" on a clean
+      // file and the checker rejected it. That is the founder's own sentence, not a schema leak.
+      const narrative = groundedNarrative({
+        whereYouStand: '9 of the 10 personal items are already verified; one is unverified: the card at 84%, above the 30% target.',
+      });
+      assert.deepEqual(checkNarrative(narrative, tinyPack()).codes, []);
+    });
+
+    it('matches on word boundaries, so "a clean report" is not the clean_report key', () => {
+      const narrative = groundedNarrative({
+        whereYouStand: 'A clean report and 9 of the 10 items in place; the card at 84% is above the 30% target.',
+      });
+      assert.deepEqual(checkNarrative(narrative, tinyPack()).codes, []);
     });
   });
 

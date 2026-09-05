@@ -33,7 +33,9 @@ import {
   MOCK_NARRATIVE_MODEL,
   NARRATIVE_DEFAULT_MODEL,
   NARRATIVE_DRIVER_SPEC,
+  NARRATIVE_FALLBACK_MODEL,
   NARRATIVE_NON_ZDR_MODEL,
+  narrativeFallbackModelFrom,
   narrativeModelFrom,
   narrativeOmitsTemperature,
   narrativeReasoningFor,
@@ -53,7 +55,9 @@ export {
   MOCK_NARRATIVE_MODEL,
   NARRATIVE_DEFAULT_MODEL,
   NARRATIVE_DRIVER_SPEC,
+  NARRATIVE_FALLBACK_MODEL,
   NARRATIVE_NON_ZDR_MODEL,
+  narrativeFallbackModelFrom,
   narrativeModelFrom,
   narrativeOmitsTemperature,
   narrativeReasoningFor,
@@ -73,6 +77,12 @@ export const NARRATIVE_TIME_LIMIT_MS = 120_000;
 export interface NarrativeDriver {
   readonly driver: 'mock' | 'openrouter';
   readonly model: string;
+  /**
+   * The driver the engine's second attempt goes to, when there is one. A different model fails on
+   * different things, so a pair clears more files than two attempts on the same model; the eval
+   * that chose the pair is written up in `models.ts`.
+   */
+  readonly fallback?: NarrativeDriver;
   write(pack: FactsPackV2, prompt: ResolvedPrompt): Promise<NarrativeV1>;
 }
 
@@ -98,27 +108,65 @@ interface NarrativeDraft {
  * required: the optional-keys `itemNotes` record arrives as an array of pairs, and a step with no
  * item arrives with the sentinel `'none'` rather than a null.
  */
+/**
+ * How a checklist key reads when it lands in prose.
+ *
+ * The prompt tells the model to name an item by its title and never by its key, and most models
+ * do; `x-ai/grok-4.3` did not, on the two "one item left" scenarios of the 2026-09-05 eval, and
+ * wrote "the single item holding it back is utilization_under_30" on both attempts. The item it
+ * named was the right one, so this folds the machine spelling into the human one before the
+ * checker sees it, the way the array of notes is folded into the record. Every number in a phrase
+ * is one the pack already carries, and `grounding.ts` still refuses any key that is not on this
+ * table, and every state word, so the fold changes spelling and nothing else.
+ */
+export const NARRATIVE_ITEM_PHRASES: Readonly<Record<string, string>> = Object.freeze({
+  credit_score_700: 'the credit score',
+  personal_information_confirmed: 'personal information',
+  clean_report: 'the clean report',
+  utilization_under_30: 'card utilization',
+  four_personal_accounts_open: 'the open account count',
+  average_age_two_years: 'average account age',
+  no_late_payments: 'late payments',
+  no_negative_items_reported: 'negative items',
+  personal_card_ten_k_limit: 'the $10,000 card limit',
+  inquiries_within_bureau_limit: 'inquiries',
+  business_name_confirmed: 'the business name',
+  industry_classification_confirmed: 'the industry classification',
+  business_entity_age_confirmed: 'the business entity age',
+  net_asset_value_confirmed: 'the net asset value',
+  business_identifier_present: 'the business identifier',
+  business_email_present: 'the business email',
+  business_website_present: 'the business website',
+});
+
+const ITEM_KEY_IN_PROSE = new RegExp(`\\b(${Object.keys(NARRATIVE_ITEM_PHRASES).join('|')})\\b`, 'g');
+
+/** The prose with every checklist key spelled the way a person would say it. */
+export function foldItemKeys(text: string): string {
+  return text.replace(ITEM_KEY_IN_PROSE, (key) => NARRATIVE_ITEM_PHRASES[key] ?? key);
+}
+
 export function narrativeFromDraft(
   draft: NarrativeDraft,
   generation: NarrativeV1['generation'],
 ): NarrativeV1 {
   const itemNotes: Partial<Record<PersonalItemKeyV2, string>> = {};
   for (const entry of draft.itemNotes) {
-    itemNotes[entry.itemKey as PersonalItemKeyV2] = entry.note;
+    itemNotes[entry.itemKey as PersonalItemKeyV2] = foldItemKeys(entry.note);
   }
   const nextSteps: NarrativeStepV1[] = draft.nextSteps.map((step) => ({
-    title: step.title,
-    detail: step.detail,
+    title: foldItemKeys(step.title),
+    detail: foldItemKeys(step.detail),
     itemKey: step.itemKey === NARRATIVE_STEP_ITEM_NONE ? null : (step.itemKey as NarrativeStepV1['itemKey']),
   }));
   return Object.freeze({
     schemaVersion: 1,
-    verdict: draft.verdict,
-    whereYouStand: draft.whereYouStand,
+    verdict: foldItemKeys(draft.verdict),
+    whereYouStand: foldItemKeys(draft.whereYouStand),
     nextSteps: Object.freeze(nextSteps),
     itemNotes: Object.freeze(itemNotes),
-    businessSide: draft.businessSide,
-    timeline: Object.freeze({ band: draft.timeline.band, reason: draft.timeline.reason }),
+    businessSide: foldItemKeys(draft.businessSide),
+    timeline: Object.freeze({ band: draft.timeline.band, reason: foldItemKeys(draft.timeline.reason) }),
     generation,
   }) as NarrativeV1;
 }
@@ -324,8 +372,13 @@ export function createNarrativeDriver(
   switch (selected) {
     case 'mock':
       return factories.createMock();
-    case 'openrouter':
-      return factories.createOpenRouter(env.OPENROUTER_API_KEY as string, narrativeModelFrom(env));
+    case 'openrouter': {
+      const apiKey = env.OPENROUTER_API_KEY as string;
+      const primary = factories.createOpenRouter(apiKey, narrativeModelFrom(env));
+      const fallbackModel = narrativeFallbackModelFrom(env);
+      if (fallbackModel === null) return primary;
+      return { ...primary, fallback: factories.createOpenRouter(apiKey, fallbackModel) };
+    }
   }
 }
 

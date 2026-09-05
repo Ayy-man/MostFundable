@@ -274,12 +274,31 @@ function lenderCodes(narrative: NarrativeV1, pack: FactsPackV2): string[] {
   return [];
 }
 
+/**
+ * The numbers the timeline reason may carry on top of the pack: the ones in the band the narrative
+ * chose. The band is a closed enum from the contract, so "30-60 days" in the reason restates a
+ * value the rules own rather than one the model invented — and the 2026-09-05 eval showed every
+ * model restating it ("within 30 to 60 days") and losing an otherwise grounded narrative to the
+ * 60. The allowance is scoped to the reason field, and only to the chosen band, so a 60 in
+ * `whereYouStand` still has to come from the pack.
+ */
+function timelineBandNumbers(narrative: NarrativeV1): ReadonlySet<string> {
+  const allowed = new Set<string>();
+  if (TIMELINE_BANDS.has(narrative.timeline.band)) addStringNumbers(allowed, narrative.timeline.band);
+  return allowed;
+}
+
 function numberCodes(narrative: NarrativeV1, pack: FactsPackV2): string[] {
   const allowed = allowedNumbers(pack);
+  const bandNumbers = timelineBandNumbers(narrative);
   for (const field of proseFields(narrative)) {
+    const isTimelineReason = field === narrative.timeline.reason;
     for (const match of field.matchAll(NUMBER_TOKEN)) {
       const canonical = canonicalNumber(match[0]);
-      if (canonical === null || !allowed.has(canonical)) return ['NUMBER_UNGROUNDED'];
+      if (canonical === null) return ['NUMBER_UNGROUNDED'];
+      if (allowed.has(canonical)) continue;
+      if (isTimelineReason && bandNumbers.has(canonical)) continue;
+      return ['NUMBER_UNGROUNDED'];
     }
   }
   return [];
@@ -305,26 +324,28 @@ function itemNoteCodes(narrative: NarrativeV1, pack: FactsPackV2): string[] {
 /**
  * Every token that belongs to the schema rather than to the reader.
  *
- * The seventeen checklist keys and the three state words. Built from the contract's own arrays, so
- * an item added to the checklist is covered the day it is added and nobody has to remember this
- * list — the same reason `allowedNumbers` walks the pack instead of naming its fields.
+ * The seventeen checklist keys and the one state token that is not an English word. Built from the
+ * contract's own arrays, so an item added to the checklist is covered the day it is added and nobody
+ * has to remember this list — the same reason `allowedNumbers` walks the pack instead of naming its
+ * fields.
+ *
+ * `verified` and `unverified` are deliberately not here. They were, and the 2026-09-05 rerun through
+ * the shipped driver showed what that costs: Sonnet wrote "six of the ten items are already
+ * verified" on a clean file — plain English, exactly what the founder says — and the checker threw
+ * the narrative away for it. A state token this rule can catch is one no reader would write;
+ * `not_checkable` qualifies, an ordinary past participle does not.
  */
 const SCHEMA_TOKENS: readonly string[] = Object.freeze([
   ...PERSONAL_ITEM_KEYS_V2,
   ...BUSINESS_ITEM_KEYS_V2,
-  'verified',
-  'unverified',
   'not_checkable',
 ]);
 
 /**
  * No schema identifier reaches the page.
  *
- * Matched on word boundaries against the lower-cased prose. `verified` is a real English word and
- * "unverified" contains "verified", but neither is a false positive worth an exception: the founder
- * writes "we could not confirm" and "still outstanding", never the state token, so a narrative that
- * reaches for the schema's vocabulary has stopped writing for the consumer. The one attempt this
- * costs is cheaper than one page saying `personal_information_confirmed`.
+ * Matched on word boundaries against the lower-cased prose, so `clean_report` is caught and "a clean
+ * report" is not.
  */
 function schemaLeakCodes(narrative: NarrativeV1): string[] {
   const prose = proseFields(narrative).join('\n').toLowerCase();

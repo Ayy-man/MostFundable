@@ -18,21 +18,39 @@ export const NARRATIVE_DRIVER_SPEC = {
 } as const satisfies DriverSpec;
 
 /**
- * The model this lane runs on. `NARRATIVE_MODEL` overrides it.
+ * The pair this lane runs on: the first attempt goes to the default model, the second to the
+ * fallback. `NARRATIVE_MODEL` and `NARRATIVE_FALLBACK_MODEL` override them.
  *
- * Sonnet 5 because the transport requires zero data retention and the OpenAI models have no ZDR
- * endpoint on OpenRouter: `openai/gpt-5.6-luna`, `-luna-pro`, `-terra` and `-sol` all return 404
- * "No endpoints found matching your data policy (Zero data retention)" under `provider.zdr: true`
- * (measured 2026-09-05), so the strongest scorer on the twenty-scenario eval is a model this
- * product cannot reach without giving up a privacy guarantee it makes about credit-derived data.
+ * Chosen on the twenty-scenario eval run through the shipped driver on 2026-09-05 (the strict
+ * schema, ZDR routing, `require_parameters`, the grounding checker — everything production runs):
  *
- * On the eval itself Sonnet 5 and luna tie at 20/20 and Haiku 4.5 scores 10/20, so ZDR is the whole
- * decision rather than a tie-break: 20 cases cost $0.81 on Sonnet. luna stays available through
- * `NARRATIVE_MODEL` for a deployment that does not require ZDR.
+ *   x-ai/grok-4.3               18/20, $0.007 a call, 23s median, 32s worst, one provider (xAI)
+ *   deepseek/deepseek-v4-flash  19/20, $0.001 a call, 42s median, 119s worst, five providers
+ *   anthropic/claude-sonnet-5   18/20, $0.031 a call, 30s median, 62s worst (Amazon Bedrock)
+ *   anthropic/claude-haiku-4.5  13/20; google/gemini-3.1-flash-lite 14/20
+ *   openai/gpt-5.6-luna         15/20, every miss a transport fault: rate-limited upstream, or
+ *                               its answer cut at the token budget; and it only routes at all with
+ *                               `require_parameters` dropped
+ *
+ * Grok is first because it is the cheap one that is also the steadiest, at a fifth of Sonnet's
+ * price (its median moved between 23s and 53s across two runs, on one provider). DeepSeek is
+ * second rather than first because its latency depends on which of five providers answers, and
+ * the driver's 120s limit sits inside that spread; as a fallback its speed costs nothing and its
+ * pass rate is the highest measured. The two fail on different things (grok wrote a checklist key
+ * in prose on the two "one item left" files, which `driver.ts` now folds; DeepSeek counted a
+ * score gap in points once), which is what makes a pair worth more than two attempts on one
+ * model: scored as the engine runs it, the pair passed 20/20. Sonnet stays a `NARRATIVE_MODEL`
+ * override, not a default.
+ *
+ * The earlier note here that OpenAI models have no ZDR endpoint was wrong: the 404 came from
+ * `require_parameters`, not from `zdr`. Every model above was reached under full ZDR.
  */
-export const NARRATIVE_DEFAULT_MODEL = 'anthropic/claude-sonnet-5';
+export const NARRATIVE_DEFAULT_MODEL = 'x-ai/grok-4.3';
 
-/** The strongest non-ZDR option, kept nameable so the reason it is not the default stays visible. */
+/** The second attempt's model, when the first is refused or the transport fails. */
+export const NARRATIVE_FALLBACK_MODEL = 'deepseek/deepseek-v4-flash';
+
+/** The strongest OpenAI option, kept nameable so the reason it is not in the pair stays visible. */
 export const NARRATIVE_NON_ZDR_MODEL = 'openai/gpt-5.6-luna';
 
 export const MOCK_NARRATIVE_MODEL = 'template-narrative-v1';
@@ -40,6 +58,17 @@ export const MOCK_NARRATIVE_MODEL = 'template-narrative-v1';
 export function narrativeModelFrom(env: EnvSource): string {
   const raw = env.NARRATIVE_MODEL;
   return typeof raw === 'string' && raw.trim().length > 0 ? raw.trim() : NARRATIVE_DEFAULT_MODEL;
+}
+
+/**
+ * The fallback model, or `null` when the second attempt should stay on the first model:
+ * `NARRATIVE_FALLBACK_MODEL=none`, or a fallback that names the same model as the primary.
+ */
+export function narrativeFallbackModelFrom(env: EnvSource): string | null {
+  const raw = env.NARRATIVE_FALLBACK_MODEL;
+  const chosen = typeof raw === 'string' && raw.trim().length > 0 ? raw.trim() : NARRATIVE_FALLBACK_MODEL;
+  if (chosen.toLowerCase() === 'none' || chosen === narrativeModelFrom(env)) return null;
+  return chosen;
 }
 
 /**

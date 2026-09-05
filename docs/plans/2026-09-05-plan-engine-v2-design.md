@@ -39,13 +39,15 @@ bureau report ──► normalizer ──► DerivedFeatures v2 ──► rules 
 3. **The model writes, it never decides.** `NarrativeV1`: verdict, where-you-stand, one to
    three next steps, a note per unverified item, the business side, and a timeline band from a
    fixed vocabulary. Prompt key `funding-readiness-narrative`, governed like the plan prompt
-   (versioned in the database, evaluator evidence required to activate). Default model
-   `anthropic/claude-sonnet-5`, because the transport requires zero data retention and the
-   OpenAI models have no ZDR endpoint on OpenRouter: luna, luna-pro, terra and sol all 404
-   under `provider.zdr: true` (measured 2026-09-05). Sonnet 5 and luna tie at 20/20 on the
-   twenty-scenario eval and Haiku 4.5 scores 10/20, so ZDR decides it rather than quality;
-   20 cases cost $0.81 on Sonnet. `openai/gpt-5.6-luna` stays available through
-   `NARRATIVE_MODEL` for a deployment that does not require ZDR.
+   (versioned in the database, evaluator evidence required to activate). The engine runs a
+   pair: first attempt on `x-ai/grok-4.3`, second on `deepseek/deepseek-v4-flash`, chosen on
+   the twenty-scenario eval run through the shipped driver on 2026-09-05 (`web/scripts/
+   narrative-eval.mjs`): grok 18/20 at $0.007 a call and a 23s median, DeepSeek 19/20 at
+   $0.001 but 42s median with a 119s worst case across five providers, Sonnet 5 18/20 at
+   $0.031. The two miss on different things, which is what a pair buys over a plain retry.
+   `NARRATIVE_MODEL` and `NARRATIVE_FALLBACK_MODEL` override them. The earlier reading that
+   OpenAI models have no ZDR endpoint was wrong: their 404 came from `require_parameters`,
+   and every model above was reached under full ZDR.
 
 4. **A deterministic checker gates every narrative.** Every number in the prose (dollars,
    percents, counts, months) must appear in the pack. Compliance language rules apply (no

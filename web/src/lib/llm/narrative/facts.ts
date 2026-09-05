@@ -5,17 +5,21 @@ import type { DerivedFeatures } from '../../analysis/features.ts';
 import type { FundingReadinessPlanV1 } from '../types.ts';
 import type { FactStateV2, FactV2, FactsPackV2, PersonalItemKeyV2 } from './contract.ts';
 
+// Each target spells its number as a digit, because `grounding.ts` grounds prose against the
+// numbers the pack carries and a verified item carries no gap line: with "two years or more" the
+// 24 in "against a 24-month target" was ungrounded on every fully-verified file (measured
+// 2026-09-05, Sonnet 5 on two of twenty scenarios), while the prompt's own house style writes it.
 const TARGET: Readonly<Record<PersonalItemKeyV2, string>> = {
   credit_score_700: '700 or higher',
   personal_information_confirmed: 'consumer confirmation of correct name and addresses',
-  clean_report: 'no employers and no more than one address',
+  clean_report: 'no employers and no more than 1 address',
   utilization_under_30: 'under 30% on every card',
-  four_personal_accounts_open: 'four or more open personal accounts',
-  average_age_two_years: 'two years or more',
+  four_personal_accounts_open: '4 or more open personal accounts',
+  average_age_two_years: '24 months (two years) or more',
   no_late_payments: 'no late payments reported',
   no_negative_items_reported: 'no negative items, collections, or public records',
   personal_card_ten_k_limit: 'at least one $10,000 or higher card limit',
-  inquiries_within_bureau_limit: 'two or fewer inquiries on each bureau',
+  inquiries_within_bureau_limit: '2 or fewer inquiries on each bureau',
 };
 function dollars(cents: number): string { return `$${(cents / 100).toLocaleString('en-US', { maximumFractionDigits: 0 })}`; }
 function personalState(features: DerivedFeatures, key: PersonalItemKeyV2, plan: FundingReadinessPlanV1): FactStateV2 {

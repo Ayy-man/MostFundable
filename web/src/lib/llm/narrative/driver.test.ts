@@ -5,6 +5,7 @@ import { packWith, tinyPack } from './__fixtures__/packs.ts';
 import {
   MOCK_NARRATIVE_MODEL,
   NARRATIVE_DEFAULT_MODEL,
+  NARRATIVE_FALLBACK_MODEL,
   NARRATIVE_MAX_TOKENS,
   NARRATIVE_NON_ZDR_MODEL,
   NARRATIVE_TIME_LIMIT_MS,
@@ -12,6 +13,7 @@ import {
   createNarrativeDriver,
   createOpenRouterNarrativeDriver,
   deriveMockNarrative,
+  foldItemKeys,
   narrativeFromDraft,
   narrativeModelFrom,
   narrativeReasoningFor,
@@ -57,7 +59,36 @@ describe('narrative driver selection', () => {
       factories,
     );
     assert.equal(driver.driver, 'openrouter');
-    assert.deepEqual(factories.openRouterCalls, [{ apiKey: 'key-value', model: 'anthropic/claude-sonnet-5' }]);
+    assert.deepEqual(factories.openRouterCalls, [
+      { apiKey: 'key-value', model: 'anthropic/claude-sonnet-5' },
+      { apiKey: 'key-value', model: NARRATIVE_FALLBACK_MODEL },
+    ]);
+  });
+
+  it('attaches the fallback model to the openrouter driver, and honours the override and "none"', () => {
+    const factories = stubFactories();
+    const paired = createNarrativeDriver({ NARRATIVE_DRIVER: 'openrouter', OPENROUTER_API_KEY: 'key-value' }, factories);
+    assert.equal(paired.model, NARRATIVE_DEFAULT_MODEL);
+    assert.equal(paired.fallback?.model, NARRATIVE_FALLBACK_MODEL);
+    assert.deepEqual(factories.openRouterCalls.map((call) => call.model), [NARRATIVE_DEFAULT_MODEL, NARRATIVE_FALLBACK_MODEL]);
+
+    const overridden = createNarrativeDriver(
+      { NARRATIVE_DRIVER: 'openrouter', OPENROUTER_API_KEY: 'key-value', NARRATIVE_FALLBACK_MODEL: ' anthropic/claude-sonnet-5 ' },
+      stubFactories(),
+    );
+    assert.equal(overridden.fallback?.model, 'anthropic/claude-sonnet-5');
+
+    const single = createNarrativeDriver(
+      { NARRATIVE_DRIVER: 'openrouter', OPENROUTER_API_KEY: 'key-value', NARRATIVE_FALLBACK_MODEL: 'none' },
+      stubFactories(),
+    );
+    assert.equal(single.fallback, undefined);
+
+    const same = createNarrativeDriver(
+      { NARRATIVE_DRIVER: 'openrouter', OPENROUTER_API_KEY: 'key-value', NARRATIVE_MODEL: NARRATIVE_FALLBACK_MODEL },
+      stubFactories(),
+    );
+    assert.equal(same.fallback, undefined, 'a fallback that names the primary is no fallback');
   });
 
   it('refuses openrouter without the key it requires, naming the key', () => {
@@ -204,6 +235,28 @@ describe('narrative draft folding', () => {
     assert.deepEqual(narrative.itemNotes, { utilization_under_30: 'A note.' });
     assert.equal(narrative.nextSteps[0].itemKey, 'utilization_under_30');
     assert.equal(narrative.schemaVersion, 1);
+  });
+
+  it('spells a checklist key that lands in prose the way a person would, and leaves the key fields alone', () => {
+    const narrative = narrativeFromDraft(
+      {
+        verdict: 'Near Ready. 1 item to fix.',
+        whereYouStand: 'The single item holding it back is utilization_under_30.',
+        nextSteps: [{ title: 'Pay the card down', detail: 'That moves utilization_under_30 and personal_card_ten_k_limit.', itemKey: 'utilization_under_30' }],
+        itemNotes: [{ itemKey: 'utilization_under_30', note: 'The card is at 84%.' }],
+        businessSide: 'business_name_confirmed is still open.',
+        timeline: { band: '30-60 days', reason: 'One item.' },
+      },
+      { driver: 'openrouter', model: NARRATIVE_DEFAULT_MODEL, promptVersion: 1 },
+    );
+    assert.equal(narrative.whereYouStand, 'The single item holding it back is card utilization.');
+    assert.equal(narrative.nextSteps[0].detail, 'That moves card utilization and the $10,000 card limit.');
+    assert.equal(narrative.nextSteps[0].itemKey, 'utilization_under_30');
+    assert.deepEqual(Object.keys(narrative.itemNotes), ['utilization_under_30']);
+    assert.equal(narrative.businessSide, 'the business name is still open.');
+    // A word that merely contains a key's letters is not a key.
+    assert.equal(foldItemKeys('inquiries_within_bureau_limits are fine'), 'inquiries_within_bureau_limits are fine');
+    assert.equal(checkNarrative(narrative, tinyPack()).codes.includes('SCHEMA_LEAKED'), false);
   });
 
   it('turns the "none" sentinel into the null the contract declares', () => {
