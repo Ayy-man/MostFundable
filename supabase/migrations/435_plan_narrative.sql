@@ -196,7 +196,7 @@ begin
       actor_profile_id, action, subject_type, subject_id, meta
     ) values (
       p_actor,
-      'admin.prompt.version.activated',
+      'admin.prompt.activated',
       'prompt',
       pg_catalog.md5('admin.prompt:' || p_key)::uuid,
       pg_catalog.jsonb_build_object(

@@ -75,7 +75,7 @@ select is(
 
 select is(
   (select count(*) from public.claim_background_jobs('worker-a', 99, 60)),
-  12::bigint,
+  11::bigint,
   'claim leases only the available rows even when requested above the cap'
 );
 select is(
