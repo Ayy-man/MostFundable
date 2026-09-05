@@ -143,14 +143,6 @@ const ALLOWLIST = [
     },
     why: "This exact path contains negative evaluator data, with one declared line per canonical rule so the local trust boundary and the shared copy gate prove the same blocked cases.",
   },
-  {
-    file: "web/src/lib/llm/narrative/contract.ts",
-    line: /45-day rule: an inquiry with no account opened within 45 days of it is disputable/,
-    rules: ["C01"],
-    expect: 1,
-    expectByRule: { C01: 1 },
-    why: "The fixed narrative contract documents the founder-defined 45-day evidence rule; it is not consumer-facing repair advice.",
-  },
 ];
 
 // Scan roots, resolved against the repo root. Only `web/src` is required: the
@@ -994,7 +986,7 @@ function selfTest() {
       // scripted workspace assistant was deleted: it had no caller left, and its three entries
       // covered five lines of its own guardrail source. 13 → 12 and two entries → one when the
       // admin surface's Industry updates tab went, taking the bank-trends disclaimer with it.
-      line.startsWith("2 allow-list entries suppressed 13 hit(s) in 2 file(s)"),
+      line.startsWith("1 allow-list entries suppressed 12 hit(s) in 1 file(s)"),
     ),
   );
 
