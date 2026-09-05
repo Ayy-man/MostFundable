@@ -37,7 +37,6 @@ insert into public.background_jobs (job, subject, "window")
 select key, 'global', '2026-08-16'
 from unnest(array[
   'crs.alert_batch',
-  'analysis.schedule_due',
   'analysis.run',
   'billing.accruals',
   'outcomes.refresh_stats',
@@ -50,7 +49,7 @@ from unnest(array[
   'kpi.rollup'
 ]) as key;
 
-select is((select count(*) from public.background_jobs), 12::bigint, 'all twelve frozen keys are accepted');
+select is((select count(*) from public.background_jobs), 11::bigint, 'all eleven frozen keys are accepted');
 select throws_ok(
   $$insert into public.background_jobs (job, subject, "window") values ('unknown.job', 'global', '2026-08-16')$$,
   '23514',

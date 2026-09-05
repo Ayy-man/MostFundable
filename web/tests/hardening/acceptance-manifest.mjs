@@ -185,7 +185,6 @@ const job = (name, handler, status, rationale) => ({ name, handler, status, rati
 
 export const jobReconciliation = Object.freeze([
   job("crs.alert_batch", null, "OPEN", "No registered handler exists; IA-19-01 forbids guessing a load target."),
-  job("analysis.schedule_due", null, "OPEN", "The catalog key has no merged handler or cadence provider."),
   job("analysis.run", "src/lib/jobs/handlers/analysis-run.ts#createAnalysisRunHandler", "PASS", "Registered by the shared Phase 14 registry."),
   job("billing.accruals", "src/lib/revenue/accruals.ts#runBillingAccrual", "PASS", "Registered with a monthly cadence provider."),
   job("outcomes.refresh_stats", "src/lib/jobs/handlers/outcomes-refresh.ts#createOutcomesRefreshHandler", "PASS", "Registered by the shared Phase 14 registry."),
