@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
-select plan(16);
+select plan(17);
 
 -- The three governed prompt families, after migration 435 widened the two closed key sets.
 
@@ -58,11 +58,12 @@ values ('43500000-0000-4000-8000-000000000011', 'admin@plan-narrative.test');
 insert into public.orgs (id, name, slug)
 values ('43500000-0000-4000-8000-000000000001', 'Plan Narrative Org', 'plan-narrative-org');
 
+-- A platform admin carries no org: profiles_role_shape_check (migration 010) says so.
 insert into public.profiles (id, role, org_id, full_name, email)
 values (
   '43500000-0000-4000-8000-000000000011',
   'platform_admin',
-  '43500000-0000-4000-8000-000000000001',
+  null,
   'Narrative Admin',
   'admin@plan-narrative.test'
 )
