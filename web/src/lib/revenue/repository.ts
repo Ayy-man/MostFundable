@@ -122,7 +122,7 @@ export function createRevenueRepository(client: RevenueRpcClient): RevenueReposi
           const item = object(value);
           const provider = item ? text(item, "provider") : null;
           const priceCents = item ? integer(item, "price_cents") : null;
-          if ((provider !== "mock" && provider !== "stripe") || priceCents === null || priceCents < 0) {
+          if (!item || (provider !== "mock" && provider !== "stripe") || priceCents === null || priceCents < 0) {
             throw new RevenueRepositoryError("REVENUE_INPUT_INVALID");
           }
           if (provider === "mock") return { provider, priceCents };

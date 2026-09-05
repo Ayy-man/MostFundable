@@ -118,10 +118,10 @@ export function mapWebhook(event: Stripe.Event): ParsedWebhook {
       isPaidInvoice && typeof object.amount_paid === "number"
         ? object.amount_paid
         : undefined,
-    invoicePaidAt: isPaidInvoice ? secondsToIso(statusTransitions?.paid_at) : undefined,
+    invoicePaidAt: isPaidInvoice ? secondsToIso(statusTransitions?.paid_at) ?? undefined : undefined,
     invoiceRef: isPaidInvoice && typeof object.id === "string" ? object.id : undefined,
-    invoicePeriodEnd: isPaidInvoice ? secondsToIso(object.period_end) : undefined,
-    invoicePeriodStart: isPaidInvoice ? secondsToIso(object.period_start) : undefined,
+    invoicePeriodEnd: isPaidInvoice ? secondsToIso(object.period_end) ?? undefined : undefined,
+    invoicePeriodStart: isPaidInvoice ? secondsToIso(object.period_start) ?? undefined : undefined,
     nextPaymentAttemptAt:
       "next_payment_attempt" in object
         ? secondsToIso(object.next_payment_attempt)
