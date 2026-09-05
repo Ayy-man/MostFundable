@@ -47,7 +47,10 @@ export function deriveReadinessPlan(
 ): FundingReadinessPlanV1 {
   const readinessScore = computeReadinessScore(features);
   const personalChecklist = checklistStatesFor(PERSONAL_CHECKLIST_V1, features);
-  personalChecklist[2] = { ...personalChecklist[2], children: accountStates(features) };
+  const utilizationIndex = personalChecklist.findIndex((item) => item.key === 'utilization_under_30');
+  if (utilizationIndex >= 0) {
+    personalChecklist[utilizationIndex] = { ...personalChecklist[utilizationIndex], children: accountStates(features) };
+  }
 
   return {
     schemaVersion: 1,

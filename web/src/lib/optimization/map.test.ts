@@ -153,7 +153,7 @@ describe("consumer optimization mapping", () => {
     assert.equal(result.readinessLabel, plan.readinessLabel);
     assert.equal(factor(result, "utilization_under_30").state, "verified");
     assert.equal(factor(result, "no_negative_items_reported").state, "verified");
-    assert.equal(result.tracks.personal.total, 8);
+    assert.equal(result.tracks.personal.total, 10);
     assert.equal(result.tracks.business.total, 7);
   });
 
@@ -245,7 +245,7 @@ describe("consumer optimization mapping", () => {
     assert.ok(result);
     assert.equal(factor(result, "personal_information_confirmed").state, "not-yet-checked");
     assert.equal(factor(result, "personal_information_confirmed").signal, null);
-    assert.equal(factor(result, "overall_report_ready").state, "not-yet-checked");
+    assert.equal(factor(result, "clean_report").state, "not-yet-checked");
     for (const entry of result.tracks.business.factors) {
       assert.equal(entry.state, "not-yet-checked", `${entry.key} has no derived evidence`);
       assert.equal(entry.signal, null);
@@ -388,11 +388,13 @@ describe("consumer optimization mapping", () => {
       ...CONSUMER_PERSONAL_FACTOR_ORDER_V1,
     ]);
     assert.deepEqual(result.tracks.personal.factors.map((entry) => entry.title), [
+      "Credit score 700 or higher",
       "Correct personal information",
       "Clean report",
       "Utilization under 30%",
       "Minimum 4 personal credit accounts open",
       "Average credit age across all accounts 2+ years",
+      "No late payments reported",
       "No negative items",
       "Minimum 1 personal credit card with limit $10k+",
       "Max 2 inquiries on each bureau",

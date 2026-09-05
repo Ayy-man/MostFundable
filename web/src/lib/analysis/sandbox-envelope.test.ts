@@ -151,7 +151,7 @@ describe('R5D-02 — the sandbox envelope and the feature extractor agree', () =
       const derived = extractFeatures(report);
 
       assert.deepEqual(derived.bureausPulled, codes.map(bureauForCode));
-      assert.equal(derived.schemaVersion, 1);
+      assert.equal(derived.schemaVersion, 2);
       assert.equal(derived.computedAt, INSTANT);
       assert.equal(derived.dti.monthlyDebtPaymentsCents, MONTHLY_DEBT_CENTS);
       // Two distinct account refs reported by every bureau, merged to two accounts, not doubled.
@@ -216,7 +216,7 @@ describe('R5D-02 — the sandbox envelope and the feature extractor agree', () =
 
     for (const entry of adapters) {
       const derived = extractFeatures(await entry.adapter.softPull(entry.memberRef, codes));
-      assert.equal(derived.schemaVersion, 1, `${entry.name} produced an unextractable envelope`);
+      assert.equal(derived.schemaVersion, 2, `${entry.name} produced an unextractable envelope`);
       assert.deepEqual(derived.bureausPulled, [...CRS_BUREAU_CODES], entry.name);
     }
   });

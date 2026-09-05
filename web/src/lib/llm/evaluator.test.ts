@@ -68,7 +68,7 @@ describe('plan evaluator', () => {
 
   it('rejects account provenance and observed-number drift', () => {
     const plan = clonePlan();
-    const child = plan.personalChecklist[2].children[0];
+    const child = plan.personalChecklist[3].children[0];
     child.accountRef = 'opaque-unknown';
     child.observedUtilizationPct = 30;
     const result = evaluatePlan(plan, derogFeatures());
@@ -78,7 +78,7 @@ describe('plan evaluator', () => {
 
   it('rejects a missing qualifying account state', () => {
     const plan = clonePlan();
-    plan.personalChecklist[2].children.pop();
+    plan.personalChecklist[3].children.pop();
     assert.equal(evaluatePlan(plan, derogFeatures()).codes.includes('CHILD_COUNT'), true);
   });
 

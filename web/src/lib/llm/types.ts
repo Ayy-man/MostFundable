@@ -52,7 +52,7 @@ export interface PlanGenerationV1 {
 export interface FundingReadinessPlanV1 {
   schemaVersion: 1;
   prompt: PromptReferenceV1;
-  derivedSchemaVersion: 1;
+  derivedSchemaVersion: 1 | 2;
   readinessScore: number;
   readinessLabel: ReadinessLabel;
   personalChecklist: ChecklistStateV1[];

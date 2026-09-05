@@ -51,7 +51,7 @@ describe("optimization view-model", () => {
     }
     // The two reporting-state factors are nobody's task.
     assert.equal(FACTOR_OWNER_BY_KEY_V1.no_negative_items_reported, "report");
-    assert.equal(FACTOR_OWNER_BY_KEY_V1.overall_report_ready, "report");
+    assert.equal(FACTOR_OWNER_BY_KEY_V1.clean_report, "report");
   });
 
   it("renders the tag from the owner axis, never only the state", () => {
@@ -119,13 +119,13 @@ describe("optimization view-model", () => {
     const live = trackSummary(personal, false);
     assert.equal(live.attention, 1);
     // Every open row that is not on the consumer, including the not-yet-checked one.
-    assert.equal(live.tracked, 6);
+    assert.equal(live.tracked, 8);
     assert.equal(live.done, 1);
-    assert.deepEqual(live.caption, ["1 needs attention", "6 tracked, not on you", "1 of 8 verified"]);
+    assert.deepEqual(live.caption, ["1 needs attention", "8 tracked, not on you", "1 of 10 verified"]);
     const canceled = trackSummary(personal, true);
     assert.equal(canceled.attention, 0);
-    assert.equal(canceled.tracked, 7);
-    assert.equal(openActionCount(view([...personal.factors], [])), 7);
+    assert.equal(canceled.tracked, 9);
+    assert.equal(openActionCount(view([...personal.factors], [])), 9);
   });
 
   it("restates the two reporting-state signals as observations, not targets", () => {

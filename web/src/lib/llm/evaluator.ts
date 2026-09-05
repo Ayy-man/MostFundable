@@ -59,19 +59,16 @@ function add(codes: Set<string>, condition: boolean, code: string): void {
 }
 
 function measurableFlags(features: DerivedFeatures): boolean[] {
-  return [
-    features.flags.utilizationUnder30,
-    features.flags.fourOrMorePersonalAccountsOpen,
-    features.flags.averageAgeTwoYearsOrMore,
-    features.flags.noNegativeItemsReported,
-    features.flags.cardWithTenKLimit,
-    features.flags.twoOrFewerInquiriesEveryBureau,
-  ];
+  return PERSONAL_CHECKLIST_V1.flatMap((seed) =>
+    seed.evidenceFlag === null || typeof features.flags[seed.evidenceFlag] !== 'boolean'
+      ? []
+      : [features.flags[seed.evidenceFlag] === true],
+  );
 }
 
 export function computeReadinessScore(features: DerivedFeatures): number {
   const flags = measurableFlags(features);
-  const rawScore = Math.round((flags.filter(Boolean).length / flags.length) * 100);
+  const rawScore = flags.length === 0 ? 0 : Math.round((flags.filter(Boolean).length / flags.length) * 100);
   const states = [
     ...checklistStatesFor(PERSONAL_CHECKLIST_V1, features),
     ...checklistStatesFor(BUSINESS_CHECKLIST_V1, features),
@@ -79,6 +76,14 @@ export function computeReadinessScore(features: DerivedFeatures): number {
   return states.some((state) => state.state === 'unverified')
     ? Math.min(rawScore, READINESS_INCOMPLETE_CAP)
     : rawScore;
+}
+
+export function itemsToFix(features: DerivedFeatures): number {
+  return checklistStatesFor(PERSONAL_CHECKLIST_V1, features).filter((item) => item.state === 'unverified').length;
+}
+
+export function personalVerifiedCount(features: DerivedFeatures): number {
+  return checklistStatesFor(PERSONAL_CHECKLIST_V1, features).filter((item) => item.state === 'verified').length;
 }
 
 export function readinessLabelFor(score: number): ReadinessLabel {
