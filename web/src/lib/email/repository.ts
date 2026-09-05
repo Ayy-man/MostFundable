@@ -1,9 +1,21 @@
 import "server-only";
 
+import { isConsumerEmailTemplate } from "./templates.ts";
+
+import type { ConsumerEmailTemplate } from "./types.ts";
+
+/** The templates a driver can actually send, and therefore the templates a receipt can carry. */
+export type PublishedEmailTemplate = "operator_card_failure" | ConsumerEmailTemplate;
+
+export function isPublishedEmailTemplate(value: unknown): value is PublishedEmailTemplate {
+  return typeof value === "string"
+    && (value === "operator_card_failure" || isConsumerEmailTemplate(value));
+}
+
 export interface EmailReceiptRecord {
   readonly receiptId: string;
   readonly deliveryId: string;
-  readonly template: "operator_card_failure";
+  readonly template: PublishedEmailTemplate;
   readonly status: "pending" | "accepted" | "failed";
   readonly providerRef: string | null;
   readonly attemptCount: number;
@@ -12,7 +24,7 @@ export interface EmailReceiptRecord {
 export interface EmailReceiptRepository {
   claim(input: {
     readonly deliveryId: string;
-    readonly template: "operator_card_failure";
+    readonly template: PublishedEmailTemplate;
     readonly recipient: string;
   }): Promise<EmailReceiptRecord>;
   accept(receiptId: string, providerRef: string): Promise<EmailReceiptRecord>;
@@ -45,7 +57,7 @@ function mapReceipt(value: unknown): EmailReceiptRecord {
   if (
     typeof row.receipt_id !== "string"
     || typeof row.delivery_id !== "string"
-    || row.template !== "operator_card_failure"
+    || !isPublishedEmailTemplate(row.template)
     || (row.status !== "pending" && row.status !== "accepted" && row.status !== "failed")
     || (row.provider_ref !== null && typeof row.provider_ref !== "string")
     || typeof row.attempt_count !== "number"

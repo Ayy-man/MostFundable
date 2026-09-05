@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  CONSUMER_NOTIFICATION_EMAIL_DEFAULTS,
   CONSUMER_NOTIFICATION_EVENT_TYPES,
   DEFAULT_CONSUMER_NOTIFICATION_PREFERENCES,
   completeConsumerNotificationPreferences,
@@ -10,15 +11,26 @@ import {
 } from "./preferences.ts";
 
 describe("consumer notification preference contract", () => {
-  it("defaults every bounded event category to in-app on and email off", () => {
+  it("defaults every category to in-app on, and email on only where it earns the interruption", () => {
     assert.equal(DEFAULT_CONSUMER_NOTIFICATION_PREFERENCES.length, 8);
     assert.deepEqual(
       DEFAULT_CONSUMER_NOTIFICATION_PREFERENCES.map((preference) => preference.eventType),
       CONSUMER_NOTIFICATION_EVENT_TYPES,
     );
-    assert.ok(DEFAULT_CONSUMER_NOTIFICATION_PREFERENCES.every(
-      (preference) => preference.inApp && !preference.email,
-    ));
+    assert.ok(DEFAULT_CONSUMER_NOTIFICATION_PREFERENCES.every((preference) => preference.inApp));
+    assert.deepEqual(
+      DEFAULT_CONSUMER_NOTIFICATION_PREFERENCES
+        .filter((preference) => preference.email)
+        .map((preference) => preference.eventType),
+      ["monitoring_alert", "team_message"],
+    );
+    // Migration 434 seeds the same table; this map is the single statement of the defaults.
+    assert.deepEqual(
+      DEFAULT_CONSUMER_NOTIFICATION_PREFERENCES.map((preference) => preference.email),
+      CONSUMER_NOTIFICATION_EVENT_TYPES.map(
+        (eventType) => CONSUMER_NOTIFICATION_EMAIL_DEFAULTS[eventType],
+      ),
+    );
   });
 
   it("fills missing database rows conservatively without overwriting saved choices", () => {

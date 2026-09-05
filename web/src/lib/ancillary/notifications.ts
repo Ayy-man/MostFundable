@@ -1,8 +1,10 @@
 import { featureFlag, type EnvSource } from "@/lib/env";
 import { dispatchOperatorCardFailureEmail } from "@/lib/email/dispatch";
+import { dispatchConsumerNotificationEmailForDelivery } from "@/lib/notifications/email-dispatch.server";
 import { createNotificationRepository, type AncillaryNotification, type NotificationRepository } from "./notification-repository.ts";
 
 import type { OperatorCardFailureDispatchEnvelope } from "@/lib/email/dispatch";
+import type { ConsumerNotificationEmailResult } from "@/lib/notifications/email-dispatch";
 
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 const UUID_ONLY = new RegExp(`^${UUID}$`, "i");
@@ -26,6 +28,9 @@ export async function runNotificationDispatch(
   window: string,
   repository: NotificationRepository = createNotificationRepository(),
   dispatchEmail: (envelope: OperatorCardFailureDispatchEnvelope) => Promise<unknown> = dispatchOperatorCardFailureEmail,
+  dispatchConsumerEmail: (
+    input: Readonly<{ deliveryId: string; notificationId: string }>,
+  ) => Promise<ConsumerNotificationEmailResult> = dispatchConsumerNotificationEmailForDelivery,
 ): Promise<{ status: string; rows?: number }> {
   const valid = (SUBJECT.test(subject) && WINDOW.test(window))
     || (EMAIL_SUBJECT.test(subject) && EMAIL_WINDOW.test(window));
@@ -34,6 +39,18 @@ export async function runNotificationDispatch(
     const envelope = await repository.readDispatchEnvelope(subject, window);
     if (envelope === null) return { status: "skipped", rows: 0 };
     if (envelope.channel === "email") await dispatchEmail(envelope);
+    if (envelope.channel === "in_app") {
+      // Consumer event email rides the same queued delivery row as the in-app notification, so it
+      // is never a second source of truth. It runs before the row is marked delivered: a provider
+      // outage leaves the tuple queued and the job retries both halves together, which is the same
+      // ordering the operator email edge above uses. The dispatcher returns rather than throws, so
+      // only a genuine dependency failure — never a preference or a missing mailbox — gets here.
+      const email = await dispatchConsumerEmail({
+        deliveryId: envelope.deliveryId,
+        notificationId: envelope.window.slice("notification:".length),
+      });
+      if (email.status === "failed") return { status: "failed" };
+    }
     return await repository.dispatch(subject, window);
   } catch {
     return { status: "failed" };

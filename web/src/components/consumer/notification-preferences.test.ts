@@ -22,16 +22,21 @@ describe("consumer notification preference surface", () => {
     assert.match(view, /TYPE_META\[preference\.eventType\]/);
   });
 
-  it("provides accessible in-app switches and keeps unsupported email visibly unavailable", () => {
+  it("provides accessible switches on both channels now that email dispatches", () => {
     assert.match(view, /role="switch"/);
     assert.match(view, /aria-checked=\{checked\}/);
     assert.match(view, /change\(preference, "inApp"\)/);
+    assert.match(view, /change\(preference, "email"\)/);
     assert.match(view, /saveConsumerNotificationPreference\(next\)/);
     assert.match(view, /aria-live="polite"/);
-    assert.equal(CONSUMER_NOTIFICATION_EMAIL_AVAILABLE, false);
-    assert.match(view, /Email unavailable/);
-    assert.match(view, /consumer delivery service yet, so email stays off/);
+    assert.equal(CONSUMER_NOTIFICATION_EMAIL_AVAILABLE, true);
+    assert.doesNotMatch(view, /Email unavailable/);
+    assert.doesNotMatch(view, /consumer delivery service yet/);
+    assert.match(view, /never carries amounts/);
+    // The email switch is disabled only while a save is in flight, plus the one global constant
+    // that would turn the channel off everywhere.
     assert.match(view, /disabled=\{saving !== null \|\| !CONSUMER_NOTIFICATION_EMAIL_AVAILABLE\}/);
+    assert.match(view, /email \$\{preference\.email \? "on" : "off"\}/);
   });
 
   it("makes the persisted in-app choice authoritative over the derived feed", () => {
