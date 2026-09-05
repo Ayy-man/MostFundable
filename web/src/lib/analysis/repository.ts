@@ -364,6 +364,18 @@ export function createSupabaseAnalysisRepository(
       }
       return result.data;
     },
+
+    async attachNarrative(input) {
+      const client = await getClient();
+      const result = await (client as unknown as RpcClient).rpc('attach_plan_narrative', {
+        p_analysis_run_id: input.analysisRunId,
+        p_narrative: input.narrative,
+      });
+      if (result.error !== null || typeof result.data !== 'boolean') {
+        throw new Error('ANALYSIS_REPOSITORY_NARRATIVE_FAILED');
+      }
+      return result.data;
+    },
   };
 }
 
@@ -397,6 +409,8 @@ export interface InMemoryAnalysisRepository extends AnalysisRepository {
   readRuns(): PersistedAnalysisRun[];
   readPlanCount(): number;
   readPullOperations(): StoredPullOperation[];
+  /** The narrative attached to a run, or null. Null is the ordinary state, not a failure. */
+  readNarrative(analysisRunId: string): unknown;
 }
 
 const systemAnalysisClock: AnalysisClock = {
@@ -419,6 +433,7 @@ export function createInMemoryAnalysisRepository(
   const jobIdBySource = new Map<string, string>();
   const results = new Map<string, StoredResult>();
   const pullOperations = new Map<string, StoredPullOperation>();
+  const narratives = new Map<string, string>();
   const enrollments = new Map(Object.entries(options.enrollments ?? {}));
   const authorized = options.authorized ?? true;
   let counter = 1;
@@ -651,6 +666,18 @@ export function createInMemoryAnalysisRepository(
       }
       operation.state = 'indeterminate';
       return true;
+    },
+
+    async attachNarrative(input) {
+      const stored = results.get(input.analysisRunId);
+      if (stored === undefined || stored.planJson === null) return false;
+      narratives.set(input.analysisRunId, JSON.stringify(input.narrative));
+      return true;
+    },
+
+    readNarrative(analysisRunId: string) {
+      const stored = narratives.get(analysisRunId);
+      return stored === undefined ? null : JSON.parse(stored) as unknown;
     },
 
     readPlanCount() {

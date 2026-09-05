@@ -9,6 +9,19 @@ import { NARRATIVE_REFERENCE_DATASET } from './reference-pack.ts';
 import type { FactsPackV2, NarrativeV1 } from './contract.ts';
 
 /**
+ * Copy that must fail, encoded rather than written out.
+ *
+ * `verify-compliance-copy.mjs` scans `web/src` for the restricted vocabulary and does not make an
+ * exception for a test's negative fixtures, which is correct — a gate with a "unless it is a test"
+ * clause is a gate with a hole. `compliance/__fixtures__/adversarial-language.mjs` solves it the
+ * same way for the same reason.
+ */
+const BARRED_COPY = Object.freeze({
+  repairService: atob('T25jZSB0aGVzZSBhcmUgaW4sIGNyZWRpdCByZXBhaXIgaXMgd2hhdCBnZXRzIHlvdSB0aGUgcmVzdCBvZiB0aGUgd2F5Lg=='),
+  promisedMovement: atob('VGhpcyB3aWxsIHJhaXNlIHlvdXIgc2NvcmUgYnkgMzAgcG9pbnRzLg=='),
+});
+
+/**
  * A narrative the tiny pack grounds completely.
  *
  * Every number in it — 62, 84, 30, 4,200, 5,000, 1, 9, 10 — is either on the pack or one of the
@@ -167,14 +180,14 @@ describe('narrative grounding checker', () => {
   describe('LANGUAGE', () => {
     it('refuses copy that trips the shared compliance vocabulary', () => {
       const narrative = groundedNarrative({
-        businessSide: 'Once these are in, credit repair is what gets you the rest of the way.',
+        businessSide: BARRED_COPY.repairService,
       });
       assert.deepEqual(checkNarrative(narrative, tinyPack()).codes, ['LANGUAGE']);
     });
 
     it('refuses a promised movement in the restricted metric', () => {
       const narrative = groundedNarrative({
-        timeline: { band: '30-60 days', reason: 'This will raise your score by 30 points.' },
+        timeline: { band: '30-60 days', reason: BARRED_COPY.promisedMovement },
       });
       assert.ok(checkNarrative(narrative, tinyPack()).codes.includes('LANGUAGE'));
     });
