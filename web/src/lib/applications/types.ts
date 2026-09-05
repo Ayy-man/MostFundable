@@ -99,11 +99,12 @@ export type VaultWritebackState =
   (typeof VAULT_WRITEBACK_STATE_VALUES)[number];
 
 /**
- * Both names come from CURRENT-STATE §44 and are UNVERIFIED-FOR-ACCOUNT
- * (pre-flight P-08): nobody on this side has seen the live VAULT schema.
+ * `bank_datapoints` is the one live VAULT destination compatible with an
+ * outcome: its required `bank_slug` and `dp_type` map from the approved
+ * payload. `data_points` needs a Vault `bank_id`, which the outbox does not
+ * have. The schema was read from the live project on 2026-09-05.
  */
 export const VAULT_WRITEBACK_TARGET_VALUES = [
-  "data_points",
   "bank_datapoints",
 ] as const;
 export type VaultWritebackTarget =

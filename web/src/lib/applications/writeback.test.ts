@@ -4,10 +4,13 @@ import { test } from "node:test";
 
 import {
   WRITEBACK_CONFIGURATION_FAILURE,
+  WRITEBACK_SCHEMA_FAILURE,
+  buildVaultWritebackInsert,
   createVaultWritebackDriver,
   type VaultClientFactory,
 } from "./writeback.ts";
 import type { VaultWritebackRow } from "./types.ts";
+import { payloadSatisfiesVaultDescriptor } from "./vault-writeback-schema.ts";
 
 // Every case here passes an object literal as the environment. Nothing in this
 // file mutates or reads the ambient environment, so the cases are
@@ -130,7 +133,43 @@ test("the driver object is frozen once built", () => {
   assert.equal(Object.isFrozen(createVaultWritebackDriver({})), true);
 });
 
-test("the module reads no ambient environment and invents no payload", () => {
+test("the live Vault payload maps to the checked-in bank_datapoints descriptor", () => {
+  const payload = buildVaultWritebackInsert(outboxRow());
+
+  assert.deepEqual(payload, {
+    bank_slug: "example-bank",
+    dp_type: "approved",
+    date_observed: "2026-08-16",
+    amount: 2_500,
+  });
+  assert.equal(
+    payload !== null && payloadSatisfiesVaultDescriptor("bank_datapoints", payload),
+    true,
+    "every delivery payload must satisfy the live table descriptor",
+  );
+});
+
+test("a fractional-cent representation or unsupported target stays recorded", async () => {
+  const fractional = outboxRow();
+  fractional.payload.amount_cents = 250_001;
+  const unsupported = outboxRow();
+  unsupported.target = "data_points" as VaultWritebackRow["target"];
+
+  assert.equal(buildVaultWritebackInsert(fractional), null);
+  assert.equal(buildVaultWritebackInsert(unsupported), null);
+
+  const driver = createVaultWritebackDriver({
+    VAULT_DRIVER: "supabase",
+    VAULT_SUPABASE_URL: "https://vault.invalid",
+    VAULT_SERVICE_KEY: "test-key",
+  });
+  assert.deepEqual(await driver.deliver(fractional), {
+    state: "recorded",
+    failureCode: WRITEBACK_SCHEMA_FAILURE,
+  });
+});
+
+test("the module reads no ambient environment and maps only the valid payload keys", () => {
   // T-11-19: the arm is chosen by the §10 resolver, never by comparing an
   // ambient variable, so there is exactly one place a driver decision is made.
   assert.equal(
@@ -140,22 +179,18 @@ test("the module reads no ambient environment and invents no payload", () => {
   );
   assert.match(SOURCE, /resolveDriver\("vault", env\)/);
 
-  // T-11-18: the payload the database already allow-listed is shipped verbatim.
-  // A field added here would be a field that never passed
-  // `private.vault_writeback_payload_valid`.
-  assert.match(SOURCE, /\.insert\(row\.payload\)/);
-  assert.equal(
-    /\.insert\(\{/.test(SOURCE),
-    false,
-    "the arm must not build an object of its own to send",
-  );
+  // T-11-18: only the database-approved keys feed the mapping. The destination
+  // has no `stats_version` column, so that payload key is intentionally absent.
+  assert.match(SOURCE, /row\.payload\.bank_ref/);
+  assert.match(SOURCE, /row\.payload\.outcome_kind/);
+  assert.match(SOURCE, /row\.payload\.decided_on/);
+  assert.match(SOURCE, /row\.payload\.amount_cents/);
+  assert.doesNotMatch(SOURCE, /row\.payload\.stats_version/);
 
   // Pass 3 of the pre-flight: nothing here claims a delivery that has not
   // happened, so the two forward-looking words never appear.
   assert.equal(/Synced|Sent to/.test(SOURCE), false);
 
-  // The unverified-schema warning has to survive edits to this file.
-  assert.match(SOURCE, /UNVERIFIED-FOR-ACCOUNT/);
-  assert.match(SOURCE, /P-08/);
-  assert.match(SOURCE, /KA-11-1/);
+  assert.match(SOURCE, /2026-09-05/);
+  assert.match(SOURCE, /bank_datapoints/);
 });
