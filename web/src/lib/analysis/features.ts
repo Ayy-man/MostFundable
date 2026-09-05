@@ -20,7 +20,7 @@ export interface DerivedFeatures {
   flags: {
     scoreAtLeast700?: boolean; personalInformationConfirmed?: boolean; cleanReport?: boolean;
     utilizationUnder30: boolean; fourOrMorePersonalAccountsOpen: boolean; averageAgeTwoYearsOrMore: boolean;
-    noLatePayments?: boolean; noNegativeItemsReported: boolean; cardWithTenKLimit: boolean;
+    noLatePayments?: boolean; noNegativeItemsReported?: boolean; cardWithTenKLimit: boolean;
     twoOrFewerInquiriesEveryBureau: boolean; thinFile: boolean;
   };
   computedAt: string;

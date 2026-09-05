@@ -75,7 +75,7 @@ describe('CRS v3 sandbox boundary', () => {
       provider: 'EFX', summary: { creditScore: { score: 705, provider: 'VANTAGE' }, subject: { currentName: 'Private', currentAddress: 'Private', previousAddresses: [{}], employmentHistory: [{}] }, totalCollections: 1, totalPublicRecords: 2, totalNegativeAccounts: 3 },
       revolvingAccounts: [{ id: 'opaque-1', accountName: ' DISCOVER ', accountNumber: 'must-not-leave-provider', accountOpen: true, balanceAmount: { amount: 4200 }, creditLimitAmount: { amount: 5000 }, pastDueAmount: { amount: 0 }, dateOpened: Date.parse('2026-08-20T00:00:00.000Z'), accountStatus: 'PAYS_AS_AGREED', isNegative: false, comments: [{ description: 'LAST REPORTED DELINQUENCIES: 9/2026=R2' }] }],
       inquiries: [{ id: 'inquiry-1', reportedDate: Date.parse('2026-08-10T00:00:00.000Z') }],
-    }] }, ['EQF1001'], pulledAt) as { perBureau: Array<{ accounts: Array<Record<string, unknown>>; inquiries: Array<Record<string, unknown>>; scores: unknown; identity: unknown; summaryCounts: unknown }> };
+    }] }, ['EQF1001'], pulledAt) as unknown as { perBureau: Array<{ accounts: Array<Record<string, unknown>>; inquiries: Array<Record<string, unknown>>; scores: unknown; identity: unknown; summaryCounts: unknown }> };
     const row = body.perBureau[0];
     assert.deepEqual(row.scores, [{ bureau: 'EQF', model: 'VANTAGE', score: 705 }]);
     assert.deepEqual(row.identity, { namesOnFile: 1, addressesOnFile: 2, employersOnFile: 1 });

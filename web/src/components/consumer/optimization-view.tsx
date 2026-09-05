@@ -302,7 +302,7 @@ export function DurableOptimizationView({
         </Panel>
         <WorkspaceSection className="mt-5" description="Starts after enrollment." title="Cinderella profile">
           <p className="text-sm leading-6 text-muted-foreground">
-            Your first analysis reads eight personal credit factors from your authorized report and seven business factors from the documents you upload. Nothing is read before your consents are on file.
+            Your first analysis reads ten personal credit factors from your authorized report and seven business factors from the documents you upload. Nothing is read before your consents are on file.
           </p>
         </WorkspaceSection>
         <FooterStamp />
