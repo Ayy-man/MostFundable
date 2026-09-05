@@ -89,12 +89,67 @@ describe("enrollment mutation feature boundary", () => {
               parkedUntil: null, status: "active", subscription: null,
             };
           },
-          async submitIdv() { submitted += 1; throw new Error("provider submission must not run"); },
+          async submitIdvWithActivationTarget() { submitted += 1; throw new Error("provider submission must not run"); },
         },
       );
       assert.equal(response.status, 200);
       assert.equal((await response.json()).needsOperatorAttention, "consent_withdrawn");
       assert.equal(submitted, 0, "the IDV route does not bypass withdrawn consent reconciliation");
+    } finally {
+      if (previous === undefined) delete process.env.FEATURE_ENROLLMENT;
+      else process.env.FEATURE_ENROLLMENT = previous;
+    }
+  });
+
+  test("the IDV activation response schedules one post-response analysis drain and ignores its failure", async () => {
+    const previous = process.env.FEATURE_ENROLLMENT;
+    process.env.FEATURE_ENROLLMENT = "1";
+    const scheduled: Array<() => void | Promise<void>> = [];
+    const target = { analysisRunId: ID, clientId: ID };
+    const drains: Array<typeof target> = [];
+    try {
+      const response = await submitIdv(
+        new Request(`http://local.test/api/enrollments/${ID}/idv`, { body: "{}", method: "POST" }),
+        ITEM_CONTEXT,
+        {
+          async getSession() {
+            return { disabledAt: null, id: ID, manages: [], orgId: ID, orgMembership: null, orgRole: null, role: "consumer" };
+          },
+          parseEnrollmentId(value) {
+            if (typeof value !== "string") throw new Error("invalid enrollment id");
+            return value;
+          },
+          parseIdvSubmitBody() { return { kind: "smfa_status" } as never; },
+          async readEnrollmentJson() { return {}; },
+          async reconcile() {
+            return {
+              attemptsRemaining: 2, consents: [], enrollmentId: ID, idvState: "passed",
+              lockedUntil: null, milestones: [], needsOperatorAttention: null,
+              parkedUntil: null, status: "enrolled", subscription: null,
+            };
+          },
+          async submitIdvWithActivationTarget() {
+            return {
+              analysisTarget: target,
+              view: {
+                attemptsRemaining: 2, consents: [], enrollmentId: ID, idvState: "passed",
+                lockedUntil: null, milestones: [], needsOperatorAttention: null,
+                parkedUntil: null, status: "active", subscription: null,
+              },
+            };
+          },
+          after(callback) { scheduled.push(callback); },
+          async drainActivatedAnalysis(received) {
+            drains.push(received);
+            throw new Error("the cron remains the safety net");
+          },
+        },
+      );
+      assert.equal(response.status, 200);
+      assert.equal((await response.json()).status, "active");
+      assert.equal(scheduled.length, 1, "activation schedules work after the response");
+      await scheduled[0]();
+      assert.deepEqual(drains, [target]);
     } finally {
       if (previous === undefined) delete process.env.FEATURE_ENROLLMENT;
       else process.env.FEATURE_ENROLLMENT = previous;

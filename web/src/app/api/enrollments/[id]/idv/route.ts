@@ -1,3 +1,5 @@
+import { after } from "next/server";
+
 import { AppError, toHttpResponse } from "@/lib/enrollment/errors";
 import { featureFlag } from "@/lib/env";
 
@@ -9,8 +11,39 @@ type IdvRouteDependencies = {
   parseIdvSubmitBody: typeof import("@/lib/enrollment/validate")["parseIdvSubmitBody"];
   readEnrollmentJson: typeof import("@/lib/enrollment/http")["readEnrollmentJson"];
   reconcile: typeof import("@/lib/enrollment/service")["reconcile"];
-  submitIdv: typeof import("@/lib/enrollment/service")["submitIdv"];
+  submitIdvWithActivationTarget: typeof import("@/lib/enrollment/service")["submitIdvWithActivationTarget"];
+  /** Test seam for Next's post-response callback. */
+  after?: (callback: () => void | Promise<void>) => void;
+  /** Test seam for the bounded post-activation analysis drain. */
+  drainActivatedAnalysis?: (target: { analysisRunId: string; clientId: string }) => Promise<void>;
 };
+
+function scheduleActivatedAnalysis(
+  schedule: (callback: () => void | Promise<void>) => void,
+  drain: (target: { analysisRunId: string; clientId: string }) => Promise<void>,
+  target: { analysisRunId: string; clientId: string },
+): void {
+  try {
+    schedule(async () => {
+      try {
+        await drain(target);
+      } catch {
+        // Durable work remains queued for the scheduled analysis drain.
+      }
+    });
+  } catch {
+    // Scheduling is opportunistic; activation has already committed.
+  }
+}
+
+async function drainOneActivatedAnalysis(target: { analysisRunId: string; clientId: string }): Promise<void> {
+  const worker = await import("@/lib/analysis/worker");
+  await worker.drainAnalysisQueue({
+    maxJobs: 1,
+    target,
+    workerId: worker.getAnalysisWorkerId(),
+  });
+}
 
 export async function POST(
   request: Request,
@@ -30,7 +63,7 @@ export async function POST(
       parseIdvSubmitBody: validate.parseIdvSubmitBody,
       readEnrollmentJson: http.readEnrollmentJson,
       reconcile: service.reconcile,
-      submitIdv: service.submitIdv,
+      submitIdvWithActivationTarget: service.submitIdvWithActivationTarget,
     }));
     const actor = await loaded.getSession();
     if (!actor) throw new AppError("unauthenticated", "Authentication is required.");
@@ -40,7 +73,15 @@ export async function POST(
       return Response.json(reconciled);
     }
     const body = loaded.parseIdvSubmitBody(await loaded.readEnrollmentJson(request));
-    return Response.json(await loaded.submitIdv(id, body, actor));
+    const result = await loaded.submitIdvWithActivationTarget(id, body, actor);
+    if (result.view.status === "active" && result.analysisTarget) {
+      scheduleActivatedAnalysis(
+        loaded.after ?? after,
+        loaded.drainActivatedAnalysis ?? drainOneActivatedAnalysis,
+        result.analysisTarget,
+      );
+    }
+    return Response.json(result.view);
   } catch (error) {
     return toHttpResponse(error);
   }

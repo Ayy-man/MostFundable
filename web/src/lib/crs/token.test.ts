@@ -145,6 +145,7 @@ function stubAdapter(getPreauthToken: (memberRef: CrsMemberRef) => Promise<Preau
 
   const adapter: CrsAdapter = {
     driver: 'mock',
+    pullBilling: 'cached-read',
     createMember: () => unreachable('createMember'),
     submitIdvStep: () => unreachable('submitIdvStep'),
     getPreauthToken(memberRef: CrsMemberRef): Promise<PreauthToken> {

@@ -12,6 +12,9 @@ import {
   CRS_SPEC_ERROR_CODES,
   CRS_SPEC_HOSTS,
   CRS_SPEC_PATHS,
+  CRS_SPEC_SMFA_FAILURE_STATUSES,
+  CRS_SPEC_SMFA_PASS_STATUSES,
+  CRS_SPEC_SMFA_PENDING_STATUS,
   CRS_SPEC_TOKEN_TTLS_SECONDS,
 } from '../spec-catalog.ts';
 import { buildPreauthToken } from '../token.ts';
@@ -317,6 +320,7 @@ export function createSandboxAdapter(config: SandboxConfig, deps: SandboxAdapter
 
   return {
     driver: 'sandbox',
+    pullBilling: 'cached-read',
 
     async createMember(identity: CrsIdentity): Promise<CreateMemberResult> {
       const registered = await requestJson('registerUser', CRS_SPEC_PATHS.directUserRegistration, 'POST', await directToken(), {
@@ -398,10 +402,19 @@ export function createSandboxAdapter(config: SandboxConfig, deps: SandboxAdapter
       }
       const active = openCrsIdvContinuation({ continuation, memberRef, now: deps.clock.now(), secret: config.secret });
       try {
-        await requestJson(
+        const statusResult = await requestJson(
           'submitIdvStep', `${path(CRS_SPEC_PATHS.smfaVerifyStatus, 'smfaToken', active.smfaToken)}?type=phone`,
           'POST', await userTokenFor(memberRef),
         );
+        const status = readString(statusResult, ['status']);
+        if (status !== null && CRS_SPEC_SMFA_PASS_STATUSES.some((value) => value === status)) {
+          return { outcome: 'pass', verifiedAt: deps.clock.now().toISOString() };
+        }
+        if (status === CRS_SPEC_SMFA_PENDING_STATUS) return { outcome: 'retry', challenge: active.challenge };
+        if (status !== null && CRS_SPEC_SMFA_FAILURE_STATUSES.some((value) => value === status)) {
+          return { outcome: 'failed', code: status as 'ORANGE' | 'RED' };
+        }
+        throw new CrsDriverError('sandbox', 'submitIdvStep', 502);
       } catch (error) {
         if (error instanceof CrsDriverError && error.codes.includes(CRS_SPEC_ERROR_CODES.alreadyIdentified)) {
           return { outcome: 'pass', verifiedAt: deps.clock.now().toISOString() };
@@ -411,7 +424,6 @@ export function createSandboxAdapter(config: SandboxConfig, deps: SandboxAdapter
         }
         throw error;
       }
-      return { outcome: 'pass', verifiedAt: deps.clock.now().toISOString() };
     },
 
     async getPreauthToken(memberRef: CrsMemberRef): Promise<PreauthToken> {

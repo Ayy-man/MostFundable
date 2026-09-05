@@ -24,6 +24,7 @@ import { MAX_IDV_ATTEMPTS } from "@/lib/idv/config";
 import type { IdvAdapter, IdvDriver, IdvResult } from "@/lib/idv/types";
 import type { CrsIdentity, CrsIdvContinuation, CrsMemberRef } from "@/lib/crs/types";
 import { trackerEnrollmentPort } from "@/lib/tracker/enrollment-adapter";
+import type { EnrollmentAnalysisTarget } from "@/lib/tracker/enrollment-adapter";
 import type { EmailAvailabilityReader } from "@/lib/enrollment/email-availability";
 import { CrsDriverError } from "@/lib/crs/errors";
 import { crsEnrollmentFailure } from "@/lib/enrollment/crs-failures";
@@ -34,7 +35,7 @@ export type EnrollmentTrackerPort = {
     actorId: string;
     clientId: string;
     enrollmentId: string;
-  }): Promise<void>;
+  }): Promise<EnrollmentAnalysisTarget | null | void>;
 };
 
 export type EnrollmentServiceDependencies = {
@@ -223,7 +224,7 @@ type EffectContext = {
 async function executeEffect(
   effect: MachineEffect,
   context: EffectContext,
-): Promise<void> {
+): Promise<EnrollmentAnalysisTarget | null | void> {
   const { actor, deps, identity, state } = context;
   const enrollmentId = state.view.enrollmentId;
 
@@ -405,7 +406,7 @@ async function executeEffect(
     }
     return;
   }
-  await deps.tracker.enrollmentActivated({
+  return deps.tracker.enrollmentActivated({
     actorId: actor.id,
     clientId: state.clientId,
     enrollmentId,
@@ -415,8 +416,13 @@ async function executeEffect(
 async function executeEffects(
   effects: readonly MachineEffect[],
   context: EffectContext,
-): Promise<void> {
-  for (const effect of effects) await executeEffect(effect, context);
+): Promise<EnrollmentAnalysisTarget | null> {
+  let analysisTarget: EnrollmentAnalysisTarget | null = null;
+  for (const effect of effects) {
+    const result = await executeEffect(effect, context);
+    if (result) analysisTarget = result;
+  }
+  return analysisTarget;
 }
 
 export async function startEnrollment(
@@ -497,17 +503,24 @@ function eventForResult(state: EnrollmentState, value: IdvResult): MachineEvent 
       ? { kind: "idv_code_correct" }
       : { kind: "idv_answer_correct" };
   }
+  // A terminal CRS SMFA rejection spends an identity attempt exactly like an incorrect answer;
+  // the state machine owns subsequent retries and parking.
+  if (value.outcome === "failed") {
+    return state.view.idvState === "sms_sent"
+      ? { kind: "idv_code_wrong" }
+      : { kind: "idv_answer_wrong" };
+  }
   return state.view.idvState === "sms_sent"
     ? { kind: "idv_code_wrong" }
     : { kind: "idv_answer_wrong" };
 }
 
-export async function submitIdv(
+async function submitIdvWithActivationTarget(
   enrollmentId: string,
   body: IdvSubmitBody,
   actor: SessionProfile,
   supplied?: EnrollmentServiceDependencies,
-): Promise<EnrollmentView> {
+): Promise<{ view: EnrollmentView; analysisTarget: EnrollmentAnalysisTarget | null }> {
   const deps = await dependencies(supplied);
   if (
     (deps.idvDriver === "crs" && body.kind !== "smfa_status") ||
@@ -532,12 +545,25 @@ export async function submitIdv(
     }),
   );
   if (body.kind === "smfa_status" && providerResult.outcome === "retry") {
-    return state.view;
+    return { view: state.view, analysisTarget: null };
   }
   const transition = nextState(machineState(state), eventForResult(state, providerResult), deps.now());
-  await executeEffects(transition.effects, { actor, deps, identity: state.identity, state });
-  return (await read(enrollmentId, actor, deps)).view;
+  const analysisTarget = await executeEffects(transition.effects, { actor, deps, identity: state.identity, state });
+  return { view: (await read(enrollmentId, actor, deps)).view, analysisTarget };
 }
+
+export async function submitIdv(
+  enrollmentId: string,
+  body: IdvSubmitBody,
+  actor: SessionProfile,
+  supplied?: EnrollmentServiceDependencies,
+): Promise<EnrollmentView> {
+  // The delegated activation-aware path preserves `businessName: state.businessName` when it
+  // submits the provider step; this public surface intentionally returns only the enrollment view.
+  return (await submitIdvWithActivationTarget(enrollmentId, body, actor, supplied)).view;
+}
+
+export { submitIdvWithActivationTarget };
 
 export async function revokeConsent(
   enrollmentId: string,

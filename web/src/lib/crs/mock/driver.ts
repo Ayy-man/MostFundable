@@ -261,6 +261,7 @@ export function createMockAdapter(deps: MockAdapterDeps): CrsAdapter {
 
   return {
     driver: 'mock',
+    pullBilling: 'cached-read',
 
     async createMember(
       identity: CrsIdentity,
