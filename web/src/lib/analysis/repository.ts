@@ -26,7 +26,7 @@ interface RepositoryOptions {
 interface RpcClient {
   rpc(name: string, args: Record<string, unknown>): Promise<{
     data: unknown;
-    error: unknown;
+    error: { code?: unknown; message?: unknown } | null;
   }>;
 }
 
@@ -185,7 +185,18 @@ export function createSupabaseAnalysisRepository(
   async function call(name: string, args: Record<string, unknown>, code: string): Promise<AnalysisJob> {
     const client = await getClient();
     const result = await (client as unknown as RpcClient).rpc(name, args);
-    if (result.error !== null) throw new Error(code);
+    if (result.error !== null) {
+      // The worker folds every repository error into one stage code, so this is the only place the
+      // database's own sentinel (`ANALYSIS_RESULT_INVALID`, a lease refusal) is still visible. Code
+      // and message only: both are closed constants, never row content.
+      console.warn(JSON.stringify({
+        event: 'analysis.repository_rpc_failed',
+        rpc: name,
+        code: typeof result.error.code === 'string' ? result.error.code : null,
+        message: typeof result.error.message === 'string' ? result.error.message : null,
+      }));
+      throw new Error(code);
+    }
     return oneJob(result.data);
   }
 

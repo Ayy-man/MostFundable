@@ -108,8 +108,11 @@ describe("live chain — enrollment and analysis both reach the tracker", { skip
 
     // Other e2e files run in parallel and can have queued jobs of their own, so the drain is
     // repeated until this client's job is terminal rather than trusting one pass to be enough.
+    // Activation also hands the same job to the server's own targeted drain (the idv route's
+    // `after`), which holds the lease while it runs; a claim here declines against a live lease,
+    // so each pass waits briefly before rereading rather than treating the first decline as final.
     let job: QueueRow | undefined = queued.data?.[0];
-    for (let attempt = 0; attempt < 3 && job?.status !== "succeeded"; attempt += 1) {
+    for (let attempt = 0; attempt < 40 && job?.status !== "succeeded"; attempt += 1) {
       await drainAnalysisQueue({ maxJobs: 10, workerId: randomUUID() });
       const reread = await pending
         .from("analysis_jobs")
@@ -117,6 +120,8 @@ describe("live chain — enrollment and analysis both reach the tracker", { skip
         .eq("client_id", clientId)
         .single();
       job = reread.data ?? undefined;
+      if (job?.status === "failed" || job?.status === "cancelled") break;
+      if (job?.status !== "succeeded") await new Promise((resolve) => setTimeout(resolve, 500));
     }
     assert.equal(job?.status, "succeeded", "the analysis job did not succeed");
     const analysisRunId = job?.analysis_run_id;
@@ -214,7 +219,11 @@ describe("live chain — enrollment and analysis both reach the tracker", { skip
         { maxJobs: 1, workerId: randomUUID() },
         { tracker: noopAnalysisStageTracker },
       );
-      assert.equal(drain.succeeded, 1, "the seeded persona did not complete a run");
+      assert.equal(
+        drain.succeeded,
+        1,
+        `the seeded persona did not complete a run: ${JSON.stringify(drain)}`,
+      );
 
       const run = await admin
         .from("analysis_runs")
