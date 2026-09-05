@@ -10,6 +10,7 @@ import {
   StatusTag,
   WorkspaceSection,
 } from "@/components/consumer/consumer-kit";
+import { PlanNarrative } from "@/components/consumer/plan-narrative";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -37,6 +38,7 @@ import {
   type DisplayStateV1,
   type TrackKindV1,
 } from "@/lib/optimization/view-model";
+import { factorAnchorId, narrativeNoteFor } from "@/lib/optimization/narrative-view";
 import { useCountUp, useLingering, usePrevious } from "@/lib/motion/hooks";
 import { cn } from "@/lib/utils";
 
@@ -333,6 +335,14 @@ export function DurableOptimizationView({
         </div>
       ) : null}
 
+      {/*
+        Above the checklist and above the next-up panel, because it is the same analysis said
+        first in words: a consumer reads the verdict, then the one thing to do, then the rows that
+        back both. It renders nothing at all when no narrative was stored, so the view below it is
+        untouched on every account that has none.
+      */}
+      <PlanNarrative view={data} />
+
       {noAnalysis ? (
         <Panel aria-labelledby="opt-next-h" className="grid xl:grid-cols-[minmax(0,1.5fr)_minmax(18rem,0.9fr)]">
           <div className="p-5 sm:p-7">
@@ -532,6 +542,7 @@ export function DurableOptimizationView({
             canceled={canceled}
             filter={filter}
             kind="personal"
+            narrative={data.narrative}
             noAnalysis={noAnalysis}
             onInstructions={setInstructions}
             onReport={onReport}
@@ -544,6 +555,7 @@ export function DurableOptimizationView({
             canceled={canceled}
             filter={filter}
             kind="business"
+            narrative={data.narrative}
             noAnalysis={noAnalysis}
             onInstructions={setInstructions}
             onReport={onReport}
@@ -731,6 +743,7 @@ function Track({
   canceled,
   filter,
   kind,
+  narrative,
   noAnalysis,
   onInstructions,
   onReport,
@@ -742,6 +755,7 @@ function Track({
   canceled: boolean;
   filter: "open" | "done";
   kind: TrackKindV1;
+  narrative: ConsumerOptimizationV1["narrative"];
   noAnalysis: boolean;
   onInstructions: (key: keyof typeof INSTRUCTIONS) => void;
   onReport: (factorKey: string, action: ReportActionV1) => Promise<void>;
@@ -838,6 +852,7 @@ function Track({
                 canceled={canceled}
                 defaultOpen={factor.key === defaultOpenKey}
                 factor={factor}
+                narrative={narrative}
                 onInstructions={onInstructions}
                 onReport={onReport}
                 pending={pendingKey === factor.key}
@@ -871,6 +886,7 @@ function FactorRow({
   canceled,
   defaultOpen,
   factor,
+  narrative,
   onInstructions,
   onReport,
   pending,
@@ -882,6 +898,7 @@ function FactorRow({
   /** Seeds the row's own state once; a manual close then sticks for the session. */
   defaultOpen: boolean;
   factor: FactorV1;
+  narrative: ConsumerOptimizationV1["narrative"];
   onInstructions: (key: keyof typeof INSTRUCTIONS) => void;
   onReport: (factorKey: string, action: ReportActionV1) => Promise<void>;
   pending: boolean;
@@ -893,7 +910,10 @@ function FactorRow({
   const state = displayState(factor, track, canceled);
   const tone = toneFor(state);
   const owner = ownerOf(factor.key);
-  const signal = signalCopy(factor);
+  // The narrative's own note for this item wins over the template line, because it was written
+  // about this person's numbers. The template stays the fallback rather than the loser: a
+  // narrative writes notes only for the items it had something to say about.
+  const signal = narrativeNoteFor(narrative, factor) ?? signalCopy(factor);
   const lead =
     state === "verified" || state === "checking" || state === "reported" || suppressLead || canceled
       ? null
@@ -925,8 +945,14 @@ function FactorRow({
      * here rather than left to the list's `divide-y`, whose `:where()` selector
      * carries no specificity and so loses to the transparent border above it.
      */
+    /*
+     * The `id` is the link target a narrative step points at. It is on the row rather than on the
+     * title so the whole disclosure, open or closed, is what the page scrolls to; `scroll-mt`
+     * keeps the row clear of the sticky header it would otherwise land under.
+     */
     <details
-      className="group/factor rounded-[8px] border border-transparent py-2 not-open:not-last:border-b-[var(--consumer-border)] open:border-[var(--consumer-surface-border)] open:bg-[color-mix(in_srgb,var(--consumer-muted),transparent_96%)]"
+      className="group/factor scroll-mt-24 rounded-[8px] border border-transparent py-2 not-open:not-last:border-b-[var(--consumer-border)] open:border-[var(--consumer-surface-border)] open:bg-[color-mix(in_srgb,var(--consumer-muted),transparent_96%)]"
+      id={factorAnchorId(factor.key)}
       onToggle={(event) => setIsOpen(event.currentTarget.open)}
       open={isOpen}
     >
