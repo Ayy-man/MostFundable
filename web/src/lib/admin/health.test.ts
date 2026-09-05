@@ -105,7 +105,7 @@ describe("admin health tiles", () => {
     assert.equal(driversTile(null).status, "unknown");
   });
 
-  it("names the five services and never the environment values that select them", () => {
+  it("names the six services and never the environment values that select them", () => {
     const drivers = readEnvDrivers({
       AI_DRIVER: "openrouter",
       BILLING_DRIVER: "",
@@ -115,7 +115,7 @@ describe("admin health tiles", () => {
       PLAN_DRIVER: "",
     });
     assert.deepEqual(drivers?.map((entry) => entry.service), [
-      "billing", "email", "crs", "plan", "assistant",
+      "billing", "email", "crs", "plan", "narrative", "assistant",
     ]);
     assert.deepEqual(drivers?.filter((entry) => entry.live).map((entry) => entry.service), ["assistant"]);
     assert.equal(driversTile(drivers).detail.includes("sk-live"), false);

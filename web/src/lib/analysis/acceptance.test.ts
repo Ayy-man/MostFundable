@@ -25,6 +25,8 @@ import {
   OPENROUTER_MODEL,
 } from '../llm/openrouter-driver.ts';
 import { extractFeatures } from './features.ts';
+import { createMockNarrativeDriver } from '../llm/narrative/driver.ts';
+import { NARRATIVE_REFERENCE_DATASET } from '../llm/narrative/reference-pack.ts';
 import { createInMemoryAnalysisRepository } from './repository.ts';
 import {
   drainAnalysisQueue,
@@ -185,6 +187,7 @@ function capturePersistence(inner: InMemoryAnalysisRepository): CaptureRepositor
       beginPullOperation: (input) => inner.beginPullOperation(input),
       recordPullReturned: (input) => inner.recordPullReturned(input),
       markPullIndeterminate: (input) => inner.markPullIndeterminate(input),
+      attachNarrative: (input) => inner.attachNarrative(input),
     },
     persisted,
   };
@@ -253,6 +256,12 @@ async function runPersona(persona: CrsPersona, driverName: 'mock' | 'openrouter'
         tracker: tracked.port,
         getAdapter: () => countedAdapter,
         getDriver: () => driver,
+        // The narrative runs on every successful analysis, so the acceptance path has to carry it
+        // or the surfaces below are not the surfaces production produces. The pack is hand-built
+        // from the contract types, which is also what makes the canary assertion meaningful: no
+        // value in it came from the provider's report at all.
+        getNarrativeDriver: createMockNarrativeDriver,
+        buildFactsPack: () => NARRATIVE_REFERENCE_DATASET[0],
       },
     ),
     { claimed: 1, succeeded: 1, failed: 0 },

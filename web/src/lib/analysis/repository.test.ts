@@ -285,6 +285,7 @@ describe('Supabase analysis repository', () => {
     const fake = new FakeAnalysisClient();
     const repository = createSupabaseAnalysisRepository({ createClient: () => fake as never });
     assert.deepEqual(Object.keys(repository).sort(), [
+      'attachNarrative',
       'beginPullOperation',
       'claim',
       'claimTarget',

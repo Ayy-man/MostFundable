@@ -6,6 +6,9 @@ import { getCrsAdapter } from '../crs/types.ts';
 import { featureFlag } from '../env.ts';
 import { getPlanDriver } from '../llm/driver.ts';
 import { runPlanEngine } from '../llm/engine.ts';
+import { getNarrativeDriver } from '../llm/narrative/driver.ts';
+import { runNarrativeEngine } from '../llm/narrative/engine.ts';
+import { buildFactsPack } from '../llm/narrative/facts.ts';
 import { trackerAnalysisStageTracker } from '../tracker/analysis-adapter.ts';
 import { assertPullAllowed } from '../ancillary/index.ts';
 import { loadParsedUploadFeatures } from '../ancillary/report-uploads.ts';
@@ -14,7 +17,9 @@ import { createSupabaseAnalysisRepository } from './repository.ts';
 
 import type { CrsAdapter, ReportCode } from '../crs/types.ts';
 import type { EnvSource } from '../env.ts';
-import type { PlanDriver } from '../llm/types.ts';
+import type { FundingReadinessPlanV1, PlanDriver } from '../llm/types.ts';
+import type { FactsPackV2 } from '../llm/narrative/contract.ts';
+import type { NarrativeDriver } from '../llm/narrative/driver.ts';
 import type {
   AnalysisJob,
   AnalysisJobErrorCode,
@@ -52,6 +57,13 @@ export interface AnalysisWorkerDependencies {
   tracker: AnalysisStageTracker;
   getAdapter(): CrsAdapter;
   getDriver(): PlanDriver;
+  getNarrativeDriver(): NarrativeDriver;
+  /**
+   * The seam to the rules half. Typed as a dependency rather than imported at the call site so a
+   * test can hand the worker a pack without reaching for the rules lane's module at all, and so the
+   * placeholder in `narrative/facts.ts` is replaceable by a merge rather than by an edit here.
+   */
+  buildFactsPack(features: DerivedFeatures, plan: FundingReadinessPlanV1): FactsPackV2;
   assertPullAllowed(clientId: string, cause: AnalysisTrigger, sourceId: string): Promise<{ allowed: boolean; reason?: string }>;
   loadParsedUploadFeatures(clientId: string, uploadId: string): Promise<DerivedFeatures | null>;
   leaseSeconds: number;
@@ -64,6 +76,8 @@ const productionDependencies: AnalysisWorkerDependencies = {
   tracker: trackerAnalysisStageTracker,
   getAdapter: getCrsAdapter,
   getDriver: getPlanDriver,
+  getNarrativeDriver,
+  buildFactsPack,
   assertPullAllowed,
   loadParsedUploadFeatures,
   leaseSeconds: DEFAULT_LEASE_SECONDS,
@@ -325,7 +339,45 @@ async function createAndPersistResult(
   } catch {
     throw new WorkerStageFailure('persistence_failed');
   }
+
+  await attachNarrative(job, derived, plan, deps);
+
   return readinessScore;
+}
+
+/**
+ * The narrative, attached after the analysis is durable, and unable to hurt it.
+ *
+ * Everything above this point can fail a job and get it retried, because everything above it is
+ * the analysis. This is prose about an analysis that is already computed, already scored and
+ * already committed, so every failure here — the facts pack, the model, the checker, the write — is
+ * caught, logged once and dropped. A consumer whose narrative did not arrive sees the surface's
+ * template copy; a consumer whose analysis was thrown away over a model timeout would see nothing
+ * and wait for a retry, and that trade is not close.
+ *
+ * `plan` being null means the pull was a no-hit: there is no plan row to attach to and nothing to
+ * narrate, so the whole step is skipped rather than attempted and swallowed.
+ */
+async function attachNarrative(
+  job: AnalysisJob,
+  derived: DerivedFeatures,
+  plan: FundingReadinessPlanV1 | null,
+  deps: AnalysisWorkerDependencies,
+): Promise<void> {
+  if (plan === null) return;
+  try {
+    const pack = deps.buildFactsPack(derived, plan);
+    const narrative = await runNarrativeEngine(deps.getNarrativeDriver(), pack);
+    if (narrative === null) return;
+    await deps.repository.attachNarrative({ analysisRunId: job.analysisRunId, narrative });
+  } catch (error) {
+    // One line, no report content, no identifiers beyond the run this already logs against.
+    console.warn(JSON.stringify({
+      event: 'analysis.narrative_skipped',
+      analysisRunId: job.analysisRunId,
+      reason: error instanceof Error ? error.message : 'unknown',
+    }));
+  }
 }
 
 async function notifyAndFinish(

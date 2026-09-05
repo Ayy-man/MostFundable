@@ -40,8 +40,12 @@ bureau report ──► normalizer ──► DerivedFeatures v2 ──► rules 
    three next steps, a note per unverified item, the business side, and a timeline band from a
    fixed vocabulary. Prompt key `funding-readiness-narrative`, governed like the plan prompt
    (versioned in the database, evaluator evidence required to activate). Default model
-   `openai/gpt-5.6-luna` with reasoning effort high; `NARRATIVE_MODEL` overrides it.
-   Claude Sonnet 5 is the fallback if the founder wants a warmer voice.
+   `anthropic/claude-sonnet-5`, because the transport requires zero data retention and the
+   OpenAI models have no ZDR endpoint on OpenRouter: luna, luna-pro, terra and sol all 404
+   under `provider.zdr: true` (measured 2026-09-05). Sonnet 5 and luna tie at 20/20 on the
+   twenty-scenario eval and Haiku 4.5 scores 10/20, so ZDR decides it rather than quality;
+   20 cases cost $0.81 on Sonnet. `openai/gpt-5.6-luna` stays available through
+   `NARRATIVE_MODEL` for a deployment that does not require ZDR.
 
 4. **A deterministic checker gates every narrative.** Every number in the prose (dollars,
    percents, counts, months) must appear in the pack. Compliance language rules apply (no

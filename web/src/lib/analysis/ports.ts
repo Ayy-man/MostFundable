@@ -125,6 +125,19 @@ export interface RecordPullReturnedInput extends SettlePullOperationInput {
   bureaus: readonly string[];
 }
 
+/**
+ * The narrative, written after the plan.
+ *
+ * Keyed by the analysis run rather than by the plan row, because that is the identifier the worker
+ * already holds and the plan row is unique on it. It carries no client id: `attach_plan_narrative`
+ * is service-role only and reaches the row through the run, so there is no tenant decision for a
+ * caller to get wrong.
+ */
+export interface AttachNarrativeInput {
+  analysisRunId: string;
+  narrative: unknown;
+}
+
 export interface AnalysisRepository {
   enqueue(input: EnqueueAnalysisJobInput): Promise<AnalysisJob>;
   claim(input: ClaimAnalysisJobInput): Promise<AnalysisJob | null>;
@@ -139,6 +152,8 @@ export interface AnalysisRepository {
   beginPullOperation(input: BeginPullOperationInput): Promise<PullOperation>;
   recordPullReturned(input: RecordPullReturnedInput): Promise<boolean>;
   markPullIndeterminate(input: SettlePullOperationInput): Promise<boolean>;
+  /** `false` when no plan row was there to attach to. Never throws for that; it is not an error. */
+  attachNarrative(input: AttachNarrativeInput): Promise<boolean>;
 }
 
 export interface AnalysisClock {

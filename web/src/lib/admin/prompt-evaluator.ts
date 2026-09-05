@@ -2,6 +2,9 @@ import "server-only";
 
 import { createPlanDriver } from "@/lib/llm/driver";
 import { evaluatePlan } from "@/lib/llm/evaluator";
+import { createNarrativeDriver } from "@/lib/llm/narrative/driver";
+import { checkNarrative } from "@/lib/llm/narrative/grounding";
+import { NARRATIVE_REFERENCE_DATASET } from "@/lib/llm/narrative/reference-pack";
 import { createSupportDraftDriver } from "@/lib/support/driver";
 import { evaluateDraftLanguage } from "@/lib/support/language-gate";
 
@@ -13,6 +16,7 @@ import {
 } from "./eval-policy.ts";
 
 import type { EnvSource } from "@/lib/env";
+import type { NarrativeDriver } from "@/lib/llm/narrative/driver";
 import type { PlanDriver } from "@/lib/llm/types";
 import type { SupportDraftDriver } from "@/lib/support/types";
 import type { EvalRunRow, PromptEvaluationSummary, RecordEvalRunInput, ResolvedPrompt } from "./prompt-types.ts";
@@ -30,6 +34,7 @@ const SUPPORT_CONFIDENCE_THRESHOLD = 0.7;
 export interface PromptEvaluatorDependencies {
   env: EnvSource;
   createPlanDriver(env: EnvSource): PlanDriver;
+  createNarrativeDriver(env: EnvSource): NarrativeDriver;
   createSupportDriver(env: EnvSource): SupportDraftDriver;
   record(input: RecordEvalRunInput): Promise<EvalRunRow>;
 }
@@ -37,6 +42,7 @@ export interface PromptEvaluatorDependencies {
 const productionDependencies: PromptEvaluatorDependencies = {
   env: process.env,
   createPlanDriver,
+  createNarrativeDriver,
   createSupportDriver: createSupportDraftDriver,
   record: (input) => recordEvalRun(input),
 };
@@ -87,6 +93,38 @@ async function evaluateSupportPrompt(prompt: ResolvedPrompt, driver: SupportDraf
   ]);
 }
 
+/**
+ * The narrative arm of the staged-prompt evaluation.
+ *
+ * One `checkNarrative` call per reference pack, split into the two evaluator keys the activation
+ * gate requires. The split is by code rather than by a second pass: `LANGUAGE` and `LENDER_NAMED`
+ * are the copy failures an operator fixes by editing wording, and everything else is a grounding
+ * failure they fix by changing what the prompt is allowed to claim. One checker, two verdicts, and
+ * no way for the two to disagree about the same narrative.
+ */
+async function evaluateNarrativePrompt(
+  prompt: ResolvedPrompt,
+  driver: NarrativeDriver,
+  expectedModel: string,
+): Promise<readonly PendingEvalRun[]> {
+  const groundingCodes = new Set<string>();
+  const languageCodes = new Set<string>();
+  for (const pack of NARRATIVE_REFERENCE_DATASET) {
+    const narrative = await driver.write(pack, prompt);
+    if (narrative.generation.driver !== driver.driver || narrative.generation.model !== expectedModel) {
+      throw new Error("ADMIN_EVAL_DRIVER_MISMATCH");
+    }
+    for (const code of checkNarrative(narrative, pack).codes) {
+      if (code === "LANGUAGE" || code === "LENDER_NAMED") languageCodes.add(code);
+      else groundingCodes.add(code);
+    }
+  }
+  return Object.freeze([
+    { promptKey: prompt.key, promptVersion: prompt.version, evaluatorKey: "narrative.grounding", passed: groundingCodes.size === 0, result: { datasetSize: NARRATIVE_REFERENCE_DATASET.length, codes: [...groundingCodes].sort() } },
+    { promptKey: prompt.key, promptVersion: prompt.version, evaluatorKey: "narrative.language", passed: languageCodes.size === 0, result: { datasetSize: NARRATIVE_REFERENCE_DATASET.length, codes: [...languageCodes].sort() } },
+  ]);
+}
+
 export async function evaluateStagedPrompt(
   prompt: ResolvedPrompt,
   actorId: string,
@@ -110,6 +148,12 @@ export async function evaluateStagedPrompt(
     const driver = deps.createPlanDriver(deps.env);
     if (driver.driver !== identity.driver) throw new Error("ADMIN_EVAL_DRIVER_MISMATCH");
     inputs = await evaluatePlanPrompt(prompt, driver, identity.model);
+  } else if (prompt.key === "funding-readiness-narrative") {
+    const driver = deps.createNarrativeDriver(deps.env);
+    if (driver.driver !== identity.driver || driver.model !== identity.model) {
+      throw new Error("ADMIN_EVAL_DRIVER_MISMATCH");
+    }
+    inputs = await evaluateNarrativePrompt(prompt, driver, identity.model);
   } else {
     const driver = deps.createSupportDriver(deps.env);
     if (driver.driver !== identity.driver || driver.model !== identity.model) {

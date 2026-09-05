@@ -21,6 +21,7 @@ import "server-only";
 
 import { resolveDriver, resolveDriverFromSpec, type EnvSource } from "@/lib/env";
 import { PLAN_DRIVER_SPEC } from "@/lib/llm/driver";
+import { NARRATIVE_DRIVER_SPEC } from "@/lib/llm/narrative/models";
 
 export type AdminHealthStatus = "ok" | "degraded" | "unknown";
 
@@ -174,12 +175,14 @@ export function buildAdminHealth(input: AdminHealthInput): AdminHealth {
 }
 
 /**
- * The five services this panel reports on, in the order they are shown.
+ * The six services this panel reports on, in the order they are shown.
  *
- * `assistant` is the `ai` row of the frozen table and `plan` has its own
- * selector, for the reason `llm/driver.ts` gives at length: sharing one key
- * between the plan engine and the assistants once moved the plan engine onto a
- * path that fails every run.
+ * `assistant` is the `ai` row of the frozen table, and `plan` and `narrative`
+ * each have their own selector, for the reason `llm/driver.ts` gives at length:
+ * sharing one key between the plan engine and the assistants once moved the plan
+ * engine onto a path that fails every run. `narrative` reads its spec from
+ * `narrative/models.ts` rather than from the driver module, so this panel does
+ * not inherit that module's load-time resolution.
  */
 export function readEnvDrivers(env: EnvSource = process.env): readonly DriverStatus[] | null {
   try {
@@ -188,6 +191,7 @@ export function readEnvDrivers(env: EnvSource = process.env): readonly DriverSta
       ["email", resolveDriver("email", env)],
       ["crs", resolveDriver("crs", env)],
       ["plan", resolveDriverFromSpec("plan", PLAN_DRIVER_SPEC, env)],
+      ["narrative", resolveDriverFromSpec("narrative", NARRATIVE_DRIVER_SPEC, env)],
       ["assistant", resolveDriver("ai", env)],
     ];
     return resolved.map(([service, driver]) => ({ service, driver, live: driver !== "mock" }));

@@ -122,6 +122,38 @@ export interface ZdrChatTransportOptions {
    * is unchanged, so this decides only which upstream serves.
    */
   readonly providerSort?: ProviderSort;
+  /**
+   * Ask the provider not to send the reasoning trace back in the response body.
+   *
+   * Measured on 2026-09-05 against `openai/gpt-oss-120b` with the narrative schema: at high effort
+   * and an 8,000-token budget the response body came back at 70.1 KB, of which 33.7 KB was the
+   * reasoning trace and 0 KB was the answer — over `RESPONSE_LIMIT_BYTES` and refused as
+   * `OPENROUTER_RESPONSE_TOO_LARGE`, so a caller that reasons hard cannot read its own answer.
+   *
+   * Excluding the trace is the smaller fix than raising the cap. The cap exists to bound what an
+   * upstream can make this process buffer, and raising it for one operation weakens that for a
+   * payload nothing reads: no caller consumes `message.reasoning`, and the model still does the
+   * reasoning and is still billed for it either way. Opt-in rather than default because the field
+   * is genuinely useful when debugging a prompt by hand.
+   */
+  readonly excludeReasoning?: boolean;
+  /**
+   * Send no `temperature` at all.
+   *
+   * `require_parameters: true` routes only to providers advertising **every** parameter in the
+   * request, and `temperature` is not on the list for every endpoint. Measured 2026-09-05 against
+   * `anthropic/claude-sonnet-5`: with `temperature` present the request 404s "No endpoints found
+   * that can handle the requested parameters" at either 0 or 1, and without it the same request
+   * routes to Amazon Bedrock under full ZDR. So for some models this is not a sampling choice, it
+   * is the difference between reaching the model and not.
+   *
+   * Opt-in, because `temperature: 0` is load-bearing for the callers that have it: the plan engine
+   * re-derives what the model returned and demands an exact reproduction, and sampling noise there
+   * is a failed analysis. The narrative has no such requirement — its guarantee is the grounding
+   * checker, which re-derives nothing and admits any wording — so it is the one operation that can
+   * give the parameter up to reach a model that will not take it.
+   */
+  readonly omitTemperature?: boolean;
   readonly fetch?: typeof globalThis.fetch;
   readonly sleep?: (milliseconds: number) => Promise<void>;
   readonly now?: () => number;
@@ -209,6 +241,29 @@ async function readBounded(response: Response, input: { operation: string; attem
   return output + decoder.decode();
 }
 
+/**
+ * Strip a markdown code fence around a JSON answer, if the model wrapped one around it.
+ *
+ * Strict `json_schema` is supposed to make this impossible, and on the models this transport was
+ * built against it does. It is not universal: measured 2026-09-05, `anthropic/claude-sonnet-5`
+ * under `response_format: json_schema, strict: true` returns a schema-correct object wrapped in
+ * ```json … ```, which `JSON.parse` rejects and which surfaced as `OPENROUTER_CONTENT_INVALID` —
+ * "the model wrote nonsense" for an answer that was in fact perfectly well-formed. That reads as a
+ * model quality problem and sends whoever debugs it in the wrong direction, which is the same trap
+ * the truncation case above was carved out to avoid.
+ *
+ * Deliberately narrow: it does nothing at all unless the trimmed content both opens and closes with
+ * a fence, so a response that is already bare JSON takes an identical path to before, and a
+ * response that is genuinely malformed still fails.
+ */
+function unfence(content: string): string {
+  const trimmed = content.trim();
+  if (!trimmed.startsWith("```") || !trimmed.endsWith("```")) return content;
+  const opened = trimmed.indexOf("\n");
+  if (opened === -1) return content;
+  return trimmed.slice(opened + 1, trimmed.length - 3);
+}
+
 function extractContent(body: string, input: { operation: string; status: number; attempt: number; requestId: string | null }): unknown {
   // OpenRouter keeps a non-streaming connection alive by front-padding the body
   // while the model generates — usually whitespace, sometimes comment lines
@@ -239,7 +294,7 @@ function extractContent(body: string, input: { operation: string; status: number
   if (first.finish_reason === "length") {
     throw new OpenRouterDriverError({ code: "OPENROUTER_TRUNCATED", ...input });
   }
-  try { return JSON.parse(first.message.content); } catch {
+  try { return JSON.parse(unfence(first.message.content)); } catch {
     throw new OpenRouterDriverError({ code: "OPENROUTER_CONTENT_INVALID", ...input });
   }
 }
@@ -287,19 +342,35 @@ const REASONING_HEADROOM_TOKENS = 256;
  * `low` — slower and dearer, the exact opposite of the intent. It is only
  * correct alongside a model that does not reason at all.
  */
-export type ReasoningSetting = "low" | "off";
+/**
+ * R5E. `high` was added for the narrative driver, whose model and job are the opposite of every
+ * other caller's: `openai/gpt-5.6-luna` writing several paragraphs of founder-voice prose from a
+ * facts pack, where the 2026-09-05 comparison measured high effort as the setting that produced
+ * accurate copy. It is never right for the extraction and verdict operations above, and a caller
+ * that reaches for it there is buying reasoning tokens it will not use.
+ */
+export type ReasoningSetting = "low" | "high" | "off";
 
 export const PROVIDER_SORTS = Object.freeze(["throughput", "latency", "price"] as const);
 export type ProviderSort = (typeof PROVIDER_SORTS)[number];
 
-function buildRequest(request: ChatRequest, model: string, reasoning: ReasoningSetting, providerSort: ProviderSort | undefined) {
+function buildRequest(
+  request: ChatRequest,
+  model: string,
+  reasoning: ReasoningSetting,
+  providerSort: ProviderSort | undefined,
+  excludeReasoning: boolean,
+  omitTemperature: boolean,
+) {
   return {
     model,
     messages: request.messages,
-    temperature: 0,
+    ...(omitTemperature ? {} : { temperature: 0 }),
     max_tokens: request.maxTokens + REASONING_HEADROOM_TOKENS,
     stream: false,
-    ...(reasoning === "off" ? {} : { reasoning: { effort: reasoning } }),
+    ...(reasoning === "off"
+      ? {}
+      : { reasoning: { effort: reasoning, ...(excludeReasoning ? { exclude: true } : {}) } }),
     provider: { zdr: true, data_collection: "deny", require_parameters: true, ...(providerSort === undefined ? {} : { sort: providerSort }) },
     response_format: { type: "json_schema", json_schema: { name: request.schemaName, strict: true, schema: request.schema } },
   };
@@ -320,7 +391,14 @@ export function createZdrChatTransport(options: ZdrChatTransportOptions): ChatTr
     model,
     async complete(request: ChatRequest): Promise<unknown> {
       const operation = OPERATION_PATTERN.test(request.operation) ? request.operation : "invalid";
-      const body = buildRequest(request, model, reasoning, options.providerSort);
+      const body = buildRequest(
+        request,
+        model,
+        reasoning,
+        options.providerSort,
+        options.excludeReasoning === true,
+        options.omitTemperature === true,
+      );
       const timeLimitMs = request.timeLimitMs ?? ATTEMPT_TIMEOUT_MS;
       for (let attempt = 1; attempt <= ATTEMPT_LIMIT; attempt += 1) {
         const controller = new AbortController();

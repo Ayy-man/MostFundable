@@ -89,6 +89,21 @@ export interface AccountFactV2 {
   /** True when a 30/60/90-day late is reported in the last 24 months. */
   readonly lateWithin24Months: boolean;
   readonly pastDueCents: number;
+  /**
+   * The balance that would put this card under the 30% target, in cents, or null when the account
+   * has no limit to be a percentage of.
+   *
+   * The rules compute it so the narrative never has to. The 2026-09-05 eval let the model work out
+   * "29% of the limit" for itself, which reads fine and is exactly the thing the grounding checker
+   * refuses: a number the rules never decided. Precomputing it here means a step that tells someone
+   * to pay a card down can name the figure and still pass the check.
+   *
+   * 29%, not 30%: a balance landing exactly on the target is not under it, and a consumer who pays
+   * to the round number and lands on 30.0% has done the work and still failed the item.
+   */
+  readonly targetBalanceCents: number | null;
+  /** What has to come off this card to reach `targetBalanceCents`; 0 when it is already under. */
+  readonly paydownCents: number | null;
 }
 
 export interface InquiryFactV2 {
