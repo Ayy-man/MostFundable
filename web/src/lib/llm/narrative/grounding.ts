@@ -27,6 +27,12 @@
  *                        leaves a factor row with nothing to say.
  *   STEP_ITEM_UNKNOWN    a step points at a checklist item the pack does not carry, so the surface
  *                        cannot link the step to a factor.
+ *   VERDICT_LABEL        the verdict does not open with the pack's own `readinessLabel`. The label
+ *                        is a rules decision — three fixed strings, chosen from the score — and the
+ *                        verdict is the one line where the consumer reads it back. A model that
+ *                        opens with "Not ready yet" where the rules said "Building Readiness" has
+ *                        quietly restated a verdict it was not asked to reach, and the surface's
+ *                        headline then disagrees with the status shown beside it.
  *
  * Codes come back sorted and deduplicated; `approved` is simply "no codes".
  */
@@ -44,6 +50,7 @@ export const NARRATIVE_CHECK_CODES = Object.freeze([
   'LENDER_NAMED',
   'ITEM_NOTE_MISMATCH',
   'STEP_ITEM_UNKNOWN',
+  'VERDICT_LABEL',
 ] as const);
 export type NarrativeCheckCode = (typeof NARRATIVE_CHECK_CODES)[number];
 
@@ -282,6 +289,19 @@ function itemNoteCodes(narrative: NarrativeV1, pack: FactsPackV2): string[] {
   return [];
 }
 
+/**
+ * The verdict opens with the pack's label, spelled the way the pack spells it.
+ *
+ * Compared after trimming leading space and case-insensitively, because "Ready." and "ready." are
+ * the same claim and failing the second would be a checker enforcing typography. Everything after
+ * the label is prose the model is free to write.
+ */
+function verdictLabelCodes(narrative: NarrativeV1, pack: FactsPackV2): string[] {
+  const label = pack.readinessLabel.trim().toLowerCase();
+  const verdict = narrative.verdict.trimStart().toLowerCase();
+  return verdict.startsWith(label) ? [] : ['VERDICT_LABEL'];
+}
+
 function stepItemCodes(narrative: NarrativeV1, pack: FactsPackV2): string[] {
   const known = new Set<string>([...pack.personal, ...pack.business].map((fact) => fact.key as string));
   for (const step of narrative.nextSteps) {
@@ -306,6 +326,7 @@ export function checkNarrative(narrative: unknown, pack: FactsPackV2): Narrative
     ...lenderCodes(value, pack),
     ...itemNoteCodes(value, pack),
     ...stepItemCodes(value, pack),
+    ...verdictLabelCodes(value, pack),
   ]);
   const sorted = [...codes].sort();
   return { approved: sorted.length === 0, codes: sorted };

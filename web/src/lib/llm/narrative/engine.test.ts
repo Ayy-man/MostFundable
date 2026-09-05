@@ -44,7 +44,7 @@ function scriptedDriver(narratives: (NarrativeV1 | Error)[]): NarrativeDriver & 
 }
 
 function ungrounded(): NarrativeV1 {
-  return { ...deriveMockNarrative(tinyPack(), 1), verdict: 'Not ready yet. 77 items to fix.' } as NarrativeV1;
+  return { ...deriveMockNarrative(tinyPack(), 1), verdict: 'Near Ready. 77 items to fix.' } as NarrativeV1;
 }
 
 describe('narrative engine', () => {

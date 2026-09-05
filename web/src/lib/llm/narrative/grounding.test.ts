@@ -31,7 +31,7 @@ const BARRED_COPY = Object.freeze({
 function groundedNarrative(overrides: Partial<NarrativeV1> = {}): NarrativeV1 {
   return {
     schemaVersion: 1,
-    verdict: 'Not ready yet. 1 item to fix.',
+    verdict: 'Near Ready. 1 item to fix.',
     whereYouStand:
       'Readiness is 62 out of 100, with 9 of the 10 personal items satisfied. The card is $4,200 on a $5,000 limit = 84%, above the 30% target.',
     nextSteps: [
@@ -94,7 +94,7 @@ describe('narrative grounding checker', () => {
     });
 
     it('refuses a field over its declared cap', () => {
-      const narrative = groundedNarrative({ verdict: `Not ready. ${'x'.repeat(200)}` });
+      const narrative = groundedNarrative({ verdict: `Near Ready. ${'x'.repeat(200)}` });
       assert.deepEqual(checkNarrative(narrative, tinyPack()).codes, ['NARRATIVE_SCHEMA']);
     });
 
@@ -115,7 +115,7 @@ describe('narrative grounding checker', () => {
 
   describe('NUMBER_UNGROUNDED', () => {
     it('refuses a number the pack does not carry', () => {
-      const narrative = groundedNarrative({ verdict: 'Not ready yet. 7 items to fix.' });
+      const narrative = groundedNarrative({ verdict: 'Near Ready. 7 items to fix.' });
       assert.deepEqual(checkNarrative(narrative, tinyPack()).codes, ['NUMBER_UNGROUNDED']);
     });
 
@@ -200,7 +200,7 @@ describe('narrative grounding checker', () => {
         itemNotes: { no_negative_items_reported: 'Nothing negative is on the file today.' },
         nextSteps: [{ title: 'Hold steady', detail: 'Keep the balances where they are.', itemKey: null }],
         whereYouStand: 'Readiness is 62 out of 100.',
-        verdict: 'Not ready yet. 1 item to fix.',
+        verdict: 'Near Ready. 1 item to fix.',
       });
       assert.deepEqual(checkNarrative(narrative, pack).codes, []);
     });
@@ -288,9 +288,42 @@ describe('narrative grounding checker', () => {
     });
   });
 
+  describe('VERDICT_LABEL', () => {
+    it('refuses a verdict that opens with a label the rules did not choose', () => {
+      // The failure the eval actually produced: a model narrating "Not ready yet" over a file the
+      // rules had labelled "Near Ready", so the headline and the status beside it disagreed.
+      const narrative = groundedNarrative({ verdict: 'Not ready yet. 1 item to fix.' });
+      assert.deepEqual(checkNarrative(narrative, tinyPack()).codes, ['VERDICT_LABEL']);
+    });
+
+    it('accepts each of the three labels against its own pack', () => {
+      for (const label of ['Ready', 'Near Ready', 'Building Readiness'] as const) {
+        const pack = packWith({ readinessLabel: label });
+        const narrative = groundedNarrative({ verdict: `${label}. 1 item to fix.` });
+        assert.deepEqual(checkNarrative(narrative, pack).codes, [], label);
+      }
+    });
+
+    it('does not turn on capitalisation or a leading space', () => {
+      for (const verdict of ['near ready. 1 item to fix.', '  Near Ready. 1 item to fix.']) {
+        assert.deepEqual(checkNarrative(groundedNarrative({ verdict }), tinyPack()).codes, []);
+      }
+    });
+
+    it('refuses a label that is merely close', () => {
+      // "Ready" is a real label, and a pack labelled "Near Ready" is the one case where a prefix
+      // check in the other direction would wave the wrong string through.
+      const pack = packWith({ readinessLabel: 'Near Ready' });
+      assert.deepEqual(
+        checkNarrative(groundedNarrative({ verdict: 'Ready. 1 item to fix.' }), pack).codes,
+        ['VERDICT_LABEL'],
+      );
+    });
+  });
+
   it('reports every distinct failure at once, sorted', () => {
     const narrative = groundedNarrative({
-      verdict: 'Not ready yet. 7 items to fix.',
+      verdict: 'Near Ready. 7 items to fix.',
       nextSteps: [{ title: 'Pay the Chase card', detail: 'Take it under 30%.', itemKey: 'no_late_payments' }],
       itemNotes: {},
     });

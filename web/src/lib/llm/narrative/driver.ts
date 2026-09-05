@@ -120,14 +120,43 @@ export function narrativeFromDraft(
 }
 
 /**
- * The pack, as the model sees it.
+ * The pack, as the model sees it: identical to `FactsPackV2` except that money is whole dollars.
  *
- * A pass-through today: `FactsPackV2` is already the redacted view — numbers, short enums and
- * creditor labels, no identifiers and no names of people — and re-listing its fields here would
- * only create a second place for the contract to drift.
+ * The 2026-09-05 twenty-scenario eval on `luna-high` is what put this here. Handing the model cents
+ * under keys named `…Cents` produced sentences like "$40,000 on a $1,200,000 limit" — the model
+ * read the number and ignored the unit, which is what a model does with a number a hundred times
+ * larger than the thing it is describing. Renaming the key to `…Dollars` and dividing is not a
+ * formatting nicety: the key name is the only unit signal the model has, and it turns out to be the
+ * one it actually reads.
+ *
+ * `FactsPackV2` itself stays in cents. Money is stored, compared and audited in integer cents
+ * everywhere else in this codebase, and changing units at the storage boundary to suit a prompt
+ * would be the wrong trade. The conversion lives here, at the one edge that needs it.
+ *
+ * The rewrite is recursive and driven by the key suffix rather than by a list of fields, for the
+ * same reason `allowedNumbers` walks the pack rather than naming its fields: a `…Cents` value the
+ * rules half adds next month is converted the day it appears, and nobody has to remember this file.
+ * `grounding.ts` already admits the whole-dollar value of every `…Cents` key, so what the model is
+ * shown and what the checker will accept stay the same set of numbers by construction.
  */
-export function serializeFactsPack(pack: FactsPackV2): FactsPackV2 {
-  return pack;
+export function serializeFactsPack(pack: FactsPackV2): Record<string, unknown> {
+  const convert = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(convert);
+    if (typeof value !== 'object' || value === null) return value;
+    const out: Record<string, unknown> = {};
+    for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+      if (key.endsWith('Cents')) {
+        // Null survives as null under the renamed key. "No limit on file" is a fact the narrative
+        // needs to be able to state, and turning it into 0 would invent a limit of zero dollars.
+        out[`${key.slice(0, -'Cents'.length)}Dollars`] =
+          typeof child === 'number' ? Math.round(child / 100) : convert(child);
+        continue;
+      }
+      out[key] = convert(child);
+    }
+    return out;
+  };
+  return convert(pack) as Record<string, unknown>;
 }
 
 export interface OpenRouterNarrativeDriverOptions {

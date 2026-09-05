@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { tinyPack } from './__fixtures__/packs.ts';
+import { packWith, tinyPack } from './__fixtures__/packs.ts';
 import {
   MOCK_NARRATIVE_MODEL,
   NARRATIVE_DEFAULT_MODEL,
@@ -14,8 +14,9 @@ import {
   narrativeFromDraft,
   narrativeModelFrom,
   narrativeReasoningFor,
+  serializeFactsPack,
 } from './driver.ts';
-import { checkNarrative } from './grounding.ts';
+import { allowedNumbers, checkNarrative } from './grounding.ts';
 import { NARRATIVE_EMBEDDED_PROMPT } from './prompt.ts';
 
 import type { NarrativeDriver, NarrativeDriverFactories } from './driver.ts';
@@ -106,6 +107,7 @@ describe('mock narrative driver', () => {
     const narrative = deriveMockNarrative(tinyPack(), 1);
     assert.ok(narrative.whereYouStand.includes('62'), 'the readiness score');
     assert.ok(narrative.whereYouStand.includes('84%'), 'the utilization');
+    assert.ok(narrative.verdict.startsWith('Near Ready.'), 'opens with the pack\'s own label');
     assert.ok(narrative.verdict.includes('1 items to fix') || narrative.verdict.includes('1 item'), 'the items-to-fix count');
   });
 
@@ -126,6 +128,56 @@ describe('mock narrative driver', () => {
     const driver = createMockNarrativeDriver();
     const narrative = await driver.write(tinyPack(), { ...PROMPT, version: 7, source: 'database' });
     assert.equal(narrative.generation.promptVersion, 7);
+  });
+});
+
+describe('the pack the model is shown', () => {
+  it('renames every money key and divides it into whole dollars', () => {
+    const shown = serializeFactsPack(tinyPack()) as Record<string, unknown>;
+    assert.equal(shown.highestRevolvingLimitCents, undefined, 'no cents key survives');
+    assert.equal(shown.highestRevolvingLimitDollars, 5_000);
+    const account = (shown.accounts as Record<string, unknown>[])[0];
+    assert.equal(account.balanceCents, undefined);
+    assert.deepEqual(
+      { balance: account.balanceDollars, limit: account.limitDollars, pastDue: account.pastDueDollars },
+      { balance: 4_200, limit: 5_000, pastDue: 0 },
+      'the eval\'s "$40,000 on a $1,200,000 limit" failure, in one assertion',
+    );
+  });
+
+  it('leaves a null limit null rather than inventing a limit of zero', () => {
+    const pack = packWith({
+      accounts: [{ ...tinyPack().accounts[0], limitCents: null, utilizationPct: null }],
+    });
+    const account = (serializeFactsPack(pack) as { accounts: Record<string, unknown>[] }).accounts[0];
+    assert.equal(account.limitDollars, null);
+  });
+
+  it('carries every other field through unchanged', () => {
+    const pack = tinyPack();
+    const shown = serializeFactsPack(pack) as Record<string, unknown>;
+    assert.equal(shown.readinessScore, pack.readinessScore);
+    assert.equal(shown.readinessLabel, pack.readinessLabel);
+    assert.deepEqual(shown.personal, pack.personal);
+    assert.equal((shown.accounts as Record<string, unknown>[])[0].label, pack.accounts[0].label);
+  });
+
+  it('shows the model only numbers the checker would already accept', () => {
+    // The two halves have to agree by construction, or the model is being handed a figure it will
+    // then be refused for repeating. Every number in the rendered pack has to be in the allowed set.
+    const pack = tinyPack();
+    const allowed = allowedNumbers(pack);
+    const numbers: number[] = [];
+    const walk = (value: unknown): void => {
+      if (typeof value === 'number') { numbers.push(value); return; }
+      if (Array.isArray(value)) { value.forEach(walk); return; }
+      if (typeof value === 'object' && value !== null) Object.values(value).forEach(walk);
+    };
+    walk(serializeFactsPack(pack));
+    assert.ok(numbers.length > 0);
+    for (const value of numbers) {
+      assert.ok(allowed.has(String(value)), `${value} is shown to the model and grounded`);
+    }
   });
 });
 

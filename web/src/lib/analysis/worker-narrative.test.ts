@@ -103,7 +103,7 @@ describe('analysis worker narrative attachment', () => {
       model: 'refusing',
       async write(pack) {
         // Grounded in nothing: the checker rejects it twice and the engine gives up.
-        return { ...deriveMockNarrative(pack, 1), verdict: 'Not ready yet. 4321 items to fix.' };
+        return { ...deriveMockNarrative(pack, 1), verdict: 'Near Ready. 4321 items to fix.' };
       },
     };
     const result = await runOneJob(repository, { narrativeDriver: refusing });
