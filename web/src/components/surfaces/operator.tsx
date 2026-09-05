@@ -71,6 +71,7 @@ import {
 import { OperatorInbox, useOperatorInbox } from "@/components/operator/inbox";
 import { ClientNotesPanel } from "@/components/operator/client-notes-panel";
 import { FeeEditSheet } from "@/components/operator/fee-edit-sheet";
+import { PlanBillingPanel } from "@/components/operator/plan-billing-panel";
 import { TrackerClientTimeline } from "@/components/operator/tracker-client-timeline";
 import { TrackerFundingPipeline } from "@/components/operator/tracker-funding-pipeline";
 import { SUPPORT_SEED } from "@/components/operator/inbox/seeds";
@@ -8995,22 +8996,17 @@ export function OperatorSurface({
             )}
           </Panel>
           {/* The subscription panel.
-              Nothing on this surface reads an organization's billing state:
+              A signed-in workspace reads its own billing record through
+              `PlanBillingPanel`, which calls `/api/billing/subscription` and
+              starts hosted checkout or portal sessions through the two
+              billing routes. The fixture branch below is demo-only:
               `OPERATOR_FIXTURES["op-apex"]` is where the Agency plan, the
-              $497/mo, the 214 active clients and the five included seats all
-              came from, and every one of them rendered as this workspace's
-              own. `/api/billing/subscription` exists and could source a real
-              version of this panel; wiring it is a change beyond removing the
-              fabrication, so a signed-in workspace gets the honest absence.
-              The renewal date, the card, and the three paid invoices are gone
-              in both paths — a payment record is not something to invent. */}
+              $497/mo and the five included seats come from, and none of it
+              is ever shown to a real organization. The renewal date, the
+              card, and the paid invoices stay out of both paths; the hosted
+              portal is where a payment record lives. */}
           {durableWorkspace ? (
-            <Panel title="Plan &amp; billing">
-              <p className="text-sm text-muted-foreground" role="status">
-                This workspace&rsquo;s plan, seat allowance, and billing history
-                are not readable from this screen, so none of them are shown.
-              </p>
-            </Panel>
+            <PlanBillingPanel />
           ) : (
           <Panel
             title={`${operator.plan} plan · ${formatDemoMoney(operator.platformFee)}/mo`}
