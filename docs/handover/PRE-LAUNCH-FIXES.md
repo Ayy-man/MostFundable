@@ -64,7 +64,7 @@ These are unchanged from ASKS-AND-DECISIONS.md, with two additions found in code
 
 ## Suggested order
 
-Done since the 2026-09-02 measurement: C1, C2, C3, C4, C5, B4, B5, B6, B7 and B8. B2 is built and waits on A4. The database now runs through migration 439 (438 is C2's paid-invoice evidence; 439 lets the v2 feature extractor persist, which the live-chain check had been failing on).
+Done since the 2026-09-02 measurement: C1, C2, C3, C4, C5, B3, B4, B5, B6, B7 and B8. B2 is built for all eight consumer event types and waits on A4. The database now runs through migration 440 (438 is C2's paid-invoice evidence; 439 lets the v2 feature extractor persist, which the live-chain check had been failing on; 440 gives the six derived consumer events a durable notification row so their emails can dispatch).
 
 1. Owner inputs 1 to 3, because A1 to A5, A7, B1 and B9 wait on them, and B8 needs the Vault owner to confirm the datapoint vocabulary before one real delivery.
 2. A4 turns on B2 and the card-failure notice together; publish the provider templates before flipping the driver.
