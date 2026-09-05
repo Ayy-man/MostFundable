@@ -378,6 +378,7 @@ export const databaseMatrices = Object.freeze([
   matrix("438_paid_invoice_revenue_evidence.test.sql", "paid-invoice-revenue-evidence"),
   matrix("439_derived_features_v2.test.sql", "derived-features-v2"),
   matrix("440_consumer_event_notification_rows.test.sql", "consumer-event-notification-rows"),
+  matrix("441_manual_stage_transitions.test.sql", "manual-stage-transitions"),
 ]);
 
 export const RATIFIED_FLAG_ORDER = Object.freeze([

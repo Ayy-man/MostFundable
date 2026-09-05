@@ -78,11 +78,15 @@ function reportStageMiss(
  * module depend on the tracker's private module layout. The class sets a fixed
  * `name`, so matching on that is the same check with none of the coupling.
  */
-function trackerErrorCode(error: unknown): "forbidden" | "failed" | null {
+function trackerErrorCode(
+  error: unknown,
+): "forbidden" | "stage_transition_not_allowed" | "failed" | null {
   if (typeof error !== "object" || error === null) return null;
   const candidate = error as { name?: unknown; code?: unknown };
   if (candidate.name !== "TrackerTransitionError") return null;
-  return candidate.code === "forbidden" ? "forbidden" : "failed";
+  if (candidate.code === "forbidden") return "forbidden";
+  if (candidate.code === "stage_transition_not_allowed") return "stage_transition_not_allowed";
+  return "failed";
 }
 
 /**

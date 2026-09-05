@@ -3,7 +3,7 @@ begin;
 set local search_path = public, extensions;
 
 -- 2026-08-17 R1A-03: carry the governed-client trigger and direct-write denial.
-select plan(62);
+select plan(65);
 
 select results_eq(
   $$
@@ -524,9 +524,9 @@ select throws_ok(
   'an operator cannot directly change stage, transition time, or funded amount'
 );
 
-select results_eq(
+select throws_ok(
   $$
-    select result, current_stage, stage_entered_at is not null
+    select *
     from public.tracker_transition_client_stage(
       '61000000-0000-0000-0000-000000001001',
       'graduate',
@@ -536,13 +536,35 @@ select results_eq(
       null
     )
   $$,
-  $$ values ('transitioned'::text, 'graduate'::public.client_stage, true) $$,
-  'manual transitions may target any valid stage without an invented graph'
+  'P0001',
+  'stage_transition_not_allowed',
+  'a manual transition cannot skip stages'
+);
+select is(
+  (select count(*)::integer from public.stage_history where client_id = '61000000-0000-0000-0000-000000001001'),
+  0,
+  'a refused skip appends no history row'
+);
+
+select results_eq(
+  $$
+    select result, current_stage, stage_entered_at is not null
+    from public.tracker_transition_client_stage(
+      '61000000-0000-0000-0000-000000001001',
+      'optimization',
+      'onboarding',
+      '61000000-0000-0000-0000-000000000001',
+      'manual',
+      null
+    )
+  $$,
+  $$ values ('transitioned'::text, 'optimization'::public.client_stage, true) $$,
+  'a manual transition advances exactly one stage'
 );
 
 select is(
   (select stage from public.clients where id = '61000000-0000-0000-0000-000000001001'),
-  'graduate'::public.client_stage,
+  'optimization'::public.client_stage,
   'a real transition changes the client stage'
 );
 select is(
@@ -582,7 +604,7 @@ select results_eq(
   $$,
   $$
     values (
-      '{"eventKey":"","from":"onboarding","source":"manual","to":"graduate"}'::jsonb
+      '{"eventKey":"","from":"onboarding","source":"manual","to":"optimization"}'::jsonb
     )
   $$,
   'the transition audit metadata records from, to, source, and eventKey'
@@ -593,14 +615,14 @@ select results_eq(
     select result, current_stage
     from public.tracker_transition_client_stage(
       '61000000-0000-0000-0000-000000001001',
-      'graduate',
-      'graduate',
+      'optimization',
+      'optimization',
       '61000000-0000-0000-0000-000000000001',
       'manual',
       null
     )
   $$,
-  $$ values ('unchanged'::text, 'graduate'::public.client_stage) $$,
+  $$ values ('unchanged'::text, 'optimization'::public.client_stage) $$,
   'a same-target manual retry returns unchanged'
 );
 select is(
@@ -611,6 +633,23 @@ select is(
   ),
   1,
   'a same-target retry appends no second history row'
+);
+
+select throws_ok(
+  $$
+    select *
+    from public.tracker_transition_client_stage(
+      '61000000-0000-0000-0000-000000001001',
+      'onboarding',
+      'optimization',
+      '61000000-0000-0000-0000-000000000001',
+      'manual',
+      null
+    )
+  $$,
+  'P0001',
+  'stage_transition_not_allowed',
+  'a manual transition cannot move a client back a stage'
 );
 
 select results_eq(
@@ -625,7 +664,7 @@ select results_eq(
       null
     )
   $$,
-  $$ values ('stale'::text, 'graduate'::public.client_stage) $$,
+  $$ values ('stale'::text, 'optimization'::public.client_stage) $$,
   'a stale expected stage returns stale'
 );
 select is(
@@ -847,7 +886,7 @@ select throws_ok(
     from public.tracker_transition_client_stage(
       '61000000-0000-0000-0000-000000001001',
       'ready',
-      'graduate',
+      'optimization',
       '61000000-0000-0000-0000-000000000011',
       'manual',
       null
@@ -871,7 +910,7 @@ select throws_ok(
     from public.tracker_transition_client_stage(
       '61000000-0000-0000-0000-000000001001',
       'ready',
-      'graduate',
+      'optimization',
       '61000000-0000-0000-0000-000000000012',
       'manual',
       null
@@ -959,14 +998,14 @@ select results_eq(
     select result, current_stage
     from public.tracker_transition_client_stage(
       '61000000-0000-0000-0000-000000001005',
-      'ready',
+      'optimization',
       'onboarding',
       '61000000-0000-0000-0000-000000000003',
       'manual',
       null
     )
   $$,
-  $$ values ('transitioned'::text, 'ready'::public.client_stage) $$,
+  $$ values ('transitioned'::text, 'optimization'::public.client_stage) $$,
   'a visible funding specialist can transition outside the default stage filter'
 );
 

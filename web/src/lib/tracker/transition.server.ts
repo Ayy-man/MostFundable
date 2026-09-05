@@ -29,20 +29,28 @@ type TrackerRpcClient = SupabaseClient<Database> & {
       p_source: "manual" | "enrollment" | "analysis";
       p_to_stage: TrackerStage;
     },
-  ): PromiseLike<{ data: RpcRow[] | null; error: { code?: string } | null }>;
+  ): PromiseLike<{ data: RpcRow[] | null; error: { code?: string; message?: string } | null }>;
 };
 
 export class TrackerTransitionError extends Error {
   readonly name = "TrackerTransitionError";
-  readonly code: "forbidden" | "failed";
+  readonly code: "forbidden" | "stage_transition_not_allowed" | "failed";
 
   // Written out rather than as a constructor parameter property: Node's
   // strip-only TypeScript mode rejects parameter properties, and this module is
   // now reachable from `node --test` through the Phase 7 tracker adapters.
-  constructor(code: "forbidden" | "failed") {
+  constructor(code: "forbidden" | "stage_transition_not_allowed" | "failed") {
     super("Tracker transition failed");
     this.code = code;
   }
+}
+
+export function trackerTransitionErrorCode(error: { code?: string; message?: string }): TrackerTransitionError["code"] {
+  if (error.code === "42501") return "forbidden";
+  if (error.code === "P0001" && error.message === "stage_transition_not_allowed") {
+    return "stage_transition_not_allowed";
+  }
+  return "failed";
 }
 
 const disabled = (): TrackerTransitionResult => ({
@@ -115,7 +123,7 @@ async function callTransition(
   args: Parameters<TrackerRpcClient["rpc"]>[1],
 ): Promise<TrackerTransitionResult> {
   const { data, error } = await db.rpc("tracker_transition_client_stage", args);
-  if (error) throw new TrackerTransitionError(error.code === "42501" ? "forbidden" : "failed");
+  if (error) throw new TrackerTransitionError(trackerTransitionErrorCode(error));
   const row = data?.[0];
   if (!row) throw new TrackerTransitionError("failed");
   return {

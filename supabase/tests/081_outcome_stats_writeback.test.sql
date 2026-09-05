@@ -885,11 +885,19 @@ select set_config(
   true
 );
 
+-- Manual moves step one stage at a time (migration 441), so walk the client up to Ready first.
+select public.tracker_transition_client_stage(
+  'bc000000-0000-0000-0000-000000000101', 'optimization', 'onboarding',
+  'bc000000-0000-0000-0000-000000000011', 'manual', null);
+select public.tracker_transition_client_stage(
+  'bc000000-0000-0000-0000-000000000101', 'ready', 'optimization',
+  'bc000000-0000-0000-0000-000000000011', 'manual', null);
+
 select results_eq(
   $$
     select result collate "C", current_stage::text collate "C"
     from public.tracker_transition_client_stage(
-      'bc000000-0000-0000-0000-000000000101', 'applying', 'onboarding',
+      'bc000000-0000-0000-0000-000000000101', 'applying', 'ready',
       'bc000000-0000-0000-0000-000000000011', 'manual', null)
   $$,
   $$ values ('transitioned'::text collate "C", 'applying'::text collate "C") $$,
