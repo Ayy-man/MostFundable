@@ -38,6 +38,8 @@ function stepForUrl(url) {
   if (pathname.includes('/users/smfa-send-link/')) return 'send-smfa-link';
   if (pathname.includes('/direct/preauth-token/')) return 'read-preauth';
   if (pathname.includes('/direct/close-account/')) return 'close-member';
+  if (pathname.includes('/users/smfa-verify-status/')) return 'smfa-verify-status';
+  if (pathname.includes('/smfa/auth/')) return 'open-smfa-link';
   return 'exchange-preauth';
 }
 
@@ -89,16 +91,36 @@ async function main() {
   const verificationStartedAt = performance.now();
   try {
     const suffix = randomUUID();
+    // CRS's published "mocked end-to-end (EFX 1-bureau)" test identity: SSN 666-10-1000 with
+    // mobile 555-555-1201 bypasses the live Equifax demo and always passes DIT. Any name,
+    // address, or email is accepted for it (the sandbox rewrites the name to its fixture).
+    // See https://crsintegration.redocly.app/client-spec/test-cases (DIT + SMFA).
     const created = await adapter.createMember({
       address: { city: 'Sandbox', line1: '1 Example Way', postalCode: '00000', state: 'CA' },
       dateOfBirth: '1990-01-01',
       email: `crs-sandbox-verifier-${suffix}@example.test`,
       firstName: 'Sandbox',
       lastName: 'Verifier',
-      phone: '5550100000',
-      ssn: '999991234',
+      phone: '5555551201',
+      ssn: '666101000',
     });
     memberRef = created.memberRef;
+
+    // Before the consumer opens the link the sandbox must report the challenge as still open.
+    const pending = await adapter.submitIdvStep(memberRef, { kind: 'smfa_status' }, created.continuation);
+    say(`smfa-before-link outcome=${pending.outcome}`);
+    if (pending.outcome !== 'retry') throw new Error('CRS_SANDBOX_SMFA_EXPECTED_RETRY');
+
+    // Open the link the way a phone would; the mocked identity completes SMFA on that visit.
+    const linkUrl = pending.challenge.verificationUrl;
+    if (typeof linkUrl !== 'string') throw new Error('CRS_SANDBOX_SMFA_LINK_MISSING');
+    const opened = await timedFetch()(linkUrl, { redirect: 'follow' });
+    if (!opened.ok) throw new Error('CRS_SANDBOX_SMFA_LINK_FAILED');
+
+    const verified = await adapter.submitIdvStep(memberRef, { kind: 'smfa_status' }, created.continuation);
+    say(`smfa-after-link outcome=${verified.outcome}`);
+    if (verified.outcome !== 'pass') throw new Error('CRS_SANDBOX_SMFA_EXPECTED_PASS');
+
     await adapter.getPreauthToken(memberRef);
   } catch {
     failed = true;

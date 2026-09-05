@@ -184,6 +184,24 @@ describe('CRS v3 sandbox boundary', () => {
     });
   }
 
+  it('passes when the completed-link response is the member record with idpass true', async () => {
+    const { adapter, continuation } = smfaStatusAdapter({ id: MEMBER, idpass: true, demo: true, just_enrolled: true });
+
+    assert.deepEqual(
+      await adapter.submitIdvStep(MEMBER, { kind: 'smfa_status' }, continuation),
+      { outcome: 'pass', verifiedAt: '2026-08-29T01:00:00.000Z' },
+    );
+  });
+
+  it('fails closed when the member record says idpass false and carries no status', async () => {
+    const { adapter, continuation } = smfaStatusAdapter({ id: MEMBER, idpass: false });
+
+    await assert.rejects(
+      () => adapter.submitIdvStep(MEMBER, { kind: 'smfa_status' }, continuation),
+      (error: unknown) => error instanceof CrsDriverError && error.httpStatus === 502,
+    );
+  });
+
   it('fails closed when a successful SMFA response has no recognised status', async () => {
     const { adapter, continuation } = smfaStatusAdapter({});
 

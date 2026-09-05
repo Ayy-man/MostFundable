@@ -410,6 +410,12 @@ export function createSandboxAdapter(config: SandboxConfig, deps: SandboxAdapter
         if (status !== null && CRS_SPEC_SMFA_PASS_STATUSES.some((value) => value === status)) {
           return { outcome: 'pass', verifiedAt: deps.clock.now().toISOString() };
         }
+        // Proven against efx-dev on 2026-09-05: once the consumer opens the SMFA link the
+        // verify-status call answers 200 with the member record (`idpass: true`) and no colour
+        // status. That is the pass signal for a completed link, so accept it explicitly.
+        if (status === null && isObject(statusResult) && statusResult.idpass === true) {
+          return { outcome: 'pass', verifiedAt: deps.clock.now().toISOString() };
+        }
         if (status === CRS_SPEC_SMFA_PENDING_STATUS) return { outcome: 'retry', challenge: active.challenge };
         if (status !== null && CRS_SPEC_SMFA_FAILURE_STATUSES.some((value) => value === status)) {
           return { outcome: 'failed', code: status as 'ORANGE' | 'RED' };
