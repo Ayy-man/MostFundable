@@ -98,7 +98,7 @@ describe("email dispatch wrapper", () => {
     const fixture = dependencies();
     await assert.rejects(
       dispatchOperatorCardFailureEmail(
-        { ...ENVELOPE, template: "crs_alert" } as unknown as OperatorCardFailureDispatchEnvelope,
+        { ...ENVELOPE, template: "unknown_template" } as unknown as OperatorCardFailureDispatchEnvelope,
         fixture.value,
       ),
       /EMAIL_DISPATCH_ENVELOPE_INVALID/,

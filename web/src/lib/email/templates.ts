@@ -9,7 +9,6 @@ import type {
 } from "./types.ts";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const CLIENT_REFERENCE_LIMIT = 128;
 const FIRST_NAME_LIMIT = 64;
 /** A first name and nothing else: no punctuation a mail client would render as markup. */
 const FIRST_NAME = /^[\p{L}][\p{L}\p{M} '’-]{0,63}$/u;
@@ -114,13 +113,6 @@ export const EMAIL_TEMPLATE_REGISTRY: EmailTemplateRegistry = Object.freeze({
     providerKeys: [],
     copy: null,
   }),
-  crs_alert: freezeDefinition({
-    template: "crs_alert",
-    providerTemplate: null,
-    internalKeys: ["MESSAGE", "CLIENT_REFERENCE"],
-    providerKeys: ["MESSAGE", "CLIENT_REFERENCE"],
-    copy: null,
-  }),
   ...CONSUMER_DEFINITIONS,
 });
 
@@ -170,22 +162,6 @@ export function validateTemplateVariables<T extends EmailTemplate>(
     }
     return Object.freeze({ DELIVERY_REFERENCE: vars.DELIVERY_REFERENCE }) as EmailTemplateVars[T];
   }
-  if (template === "crs_alert") {
-    assertExactKeys(vars, ["MESSAGE", "CLIENT_REFERENCE"]);
-    if (
-      vars.MESSAGE !== "Sign in to view"
-      || typeof vars.CLIENT_REFERENCE !== "string"
-      || vars.CLIENT_REFERENCE.trim() !== vars.CLIENT_REFERENCE
-      || vars.CLIENT_REFERENCE.length < 1
-      || vars.CLIENT_REFERENCE.length > CLIENT_REFERENCE_LIMIT
-    ) {
-      throw new Error("EMAIL_TEMPLATE_VARS_INVALID");
-    }
-    return Object.freeze({
-      MESSAGE: "Sign in to view" as const,
-      CLIENT_REFERENCE: vars.CLIENT_REFERENCE,
-    }) as EmailTemplateVars[T];
-  }
   if (isConsumerEmailTemplate(template)) {
     return validateConsumerVariables(vars) as EmailTemplateVars[T];
   }
@@ -205,11 +181,7 @@ export function buildProviderVariables<T extends EmailTemplate>(
       FIRST_NAME: consumer.FIRST_NAME,
     });
   }
-  const alert = valid as EmailTemplateVars["crs_alert"];
-  return Object.freeze({
-    MESSAGE: alert.MESSAGE,
-    CLIENT_REFERENCE: alert.CLIENT_REFERENCE,
-  });
+  throw new Error("EMAIL_TEMPLATE_INVALID");
 }
 
 /**
@@ -226,22 +198,4 @@ export function deliveryReference<T extends EmailTemplate>(
     throw new Error("EMAIL_TEMPLATE_UNPUBLISHED");
   }
   return reference;
-}
-
-export function buildCrsAlertPayload(
-  row: Readonly<{ client_id?: unknown; [key: string]: unknown }>,
-): EmailTemplateVars["crs_alert"] {
-  const clientReference = row.client_id;
-  if (
-    typeof clientReference !== "string"
-    || clientReference.trim() !== clientReference
-    || clientReference.length < 1
-    || clientReference.length > CLIENT_REFERENCE_LIMIT
-  ) {
-    throw new Error("EMAIL_CLIENT_REFERENCE_INVALID");
-  }
-  return Object.freeze({
-    MESSAGE: "Sign in to view",
-    CLIENT_REFERENCE: clientReference,
-  });
 }

@@ -1,5 +1,6 @@
 import { buildProviderVariables, validateTemplateVariables } from "./templates.ts";
-import type { EmailReceiptRepository } from "./repository.ts";
+import { isPublishedEmailTemplate } from "./repository.ts";
+import type { EmailReceiptRepository, PublishedEmailTemplate } from "./repository.ts";
 import type { EmailDriver, EmailSendInput, EmailSendReceipt, EmailTemplate } from "./types.ts";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -17,21 +18,22 @@ export function createMockEmailDriver(input: {
   readonly repository: EmailReceiptRepository;
 }): EmailDriver {
   return {
-    // The mock driver stays deliberately narrow: it is what an unconfigured deployment gets, and
-    // the consumer dispatcher no-ops before reaching a driver when EMAIL_DRIVER is unset or mock.
+    // The mock shares Resend's published-template boundary, so local delivery exercises the same
+    // catalog even though consumer dispatch normally stops at its configuration gate.
     async send<T extends EmailTemplate>(
       request: EmailSendInput<T>,
     ): Promise<EmailSendReceipt> {
-      if (!UUID.test(request.orgId) || request.template !== "operator_card_failure") {
+      if (!UUID.test(request.orgId) || !isPublishedEmailTemplate(request.template)) {
         throw new Error("EMAIL_SEND_INPUT_INVALID");
       }
-      const vars = validateTemplateVariables("operator_card_failure", request.vars);
-      buildProviderVariables("operator_card_failure", vars);
+      const template: PublishedEmailTemplate = request.template;
+      const vars = validateTemplateVariables(template, request.vars);
+      buildProviderVariables(template, vars);
       const deliveryId = vars.DELIVERY_REFERENCE;
       const recipient = normalizeRecipient(request.to);
       const receipt = await input.repository.claim({
         deliveryId,
-        template: "operator_card_failure",
+        template,
         recipient,
       });
       if (receipt.status === "accepted" && receipt.providerRef !== null) {
