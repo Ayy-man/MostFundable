@@ -157,6 +157,36 @@ function monthsBetween(earlier: unknown, laterMs: number): number | null {
   return Math.floor((laterMs - earlierMs) / (30.4375 * 24 * 60 * 60 * 1000));
 }
 
+function isoFromProviderDate(value: unknown): string | null {
+  const instant = typeof value === 'number' ? value : Date.parse(String(value));
+  return Number.isFinite(instant) ? new Date(instant).toISOString() : null;
+}
+
+function scoreModel(value: unknown): string {
+  const provider = readString({ provider: value }, ['provider'])?.toUpperCase().replace(/[ -]+/g, '_');
+  if (provider === 'VANTAGE' || provider === 'VANTAGE_SCORE_4' || provider === 'FICO' || provider === 'ERS') return provider;
+  return 'UNKNOWN';
+}
+
+function accountIsLate(value: Record<string, unknown>, pulledAtMs: number): boolean {
+  const status = readString(value, ['accountStatus']) ?? '';
+  if (status !== 'PAYS_AS_AGREED' && /(?:PAST[ -]?DUE|LATE|DELINQUENT)/i.test(status)) return true;
+  if ((dollarsToCents(value.pastDueAmount) ?? 0) > 0) return true;
+  const comments = Array.isArray(value.comments) ? value.comments : [];
+  return comments.some((comment) => {
+    if (!isObject(comment)) return false;
+    const description = readString(comment, ['description']);
+    const match = description?.match(/LAST REPORTED DELINQUENCIES:\s*(\d{1,2})\/(\d{4})=R[2-9]/i);
+    if (match === null || match === undefined) return false;
+    const month = Number(match[1]);
+    const year = Number(match[2]);
+    if (month < 1 || month > 12) return false;
+    const delinquencyMs = Date.UTC(year, month - 1, 1);
+    const cutoffMs = Date.UTC(new Date(pulledAtMs).getUTCFullYear(), new Date(pulledAtMs).getUTCMonth() - 24, 1);
+    return delinquencyMs >= cutoffMs && delinquencyMs <= pulledAtMs;
+  });
+}
+
 function normalizeAccount(value: unknown, kind: string, pulledAtMs: number): Record<string, unknown> | null {
   if (!isObject(value)) return null;
   const accountRef = readString(value, ['id']);
@@ -168,12 +198,16 @@ function normalizeAccount(value: unknown, kind: string, pulledAtMs: number): Rec
     balanceCents,
     limitCents: dollarsToCents(value.creditLimitAmount),
     ageMonths: monthsBetween(value.dateOpened, pulledAtMs),
+    label: (readString(value, ['accountName']) ?? '').trim().slice(0, 64) || null,
+    pastDueCents: dollarsToCents(value.pastDueAmount) ?? 0,
+    lateWithin24Months: accountIsLate(value, pulledAtMs),
     isOpen: value.accountOpen === true,
     isNegative: value.isNegative === true,
+    openedAt: isoFromProviderDate(value.dateOpened),
   };
 }
 
-function normalizeReportBody(body: unknown, reportCodes: readonly ReportCode[], pulledAt: string) {
+export function normalizeReportBody(body: unknown, reportCodes: readonly ReportCode[], pulledAt: string) {
   const root = Array.isArray(body) ? { providerViews: body } : isObject(body) ? body : {};
   const providerViews = Array.isArray(root.providerViews) ? root.providerViews : [];
   const requested = new Set(
@@ -200,20 +234,51 @@ function normalizeReportBody(body: unknown, reportCodes: readonly ReportCode[], 
       if (!isObject(inquiry)) return [];
       const inquiryRef = readString(inquiry, ['id']);
       const monthsAgo = monthsBetween(inquiry.reportedDate, pulledAtMs);
-      return inquiryRef === null || monthsAgo === null ? [] : [{ inquiryRef, monthsAgo }];
+      const reportedAt = isoFromProviderDate(inquiry.reportedDate);
+      if (inquiryRef === null || monthsAgo === null || reportedAt === null) return [];
+      const inquiryMs = Date.parse(reportedAt);
+      return [{
+        inquiryRef,
+        monthsAgo,
+        reportedAt,
+        matchedNewAccountWithin45Days: accounts.some((account) => {
+          const openedAt = typeof account.openedAt === 'string' ? Date.parse(account.openedAt) : Number.NaN;
+          return Number.isFinite(openedAt) && openedAt >= inquiryMs && openedAt <= inquiryMs + 45 * 24 * 60 * 60 * 1000;
+        }),
+      }];
     }) : [];
+    // `openedAt` is transient matching input; the normalized report must not retain it.
+    const normalizedAccounts = accounts.map(({ openedAt: _openedAt, ...account }) => account);
     const monthlyDebtPaymentsCents = ['revolvingAccounts', 'mortgageAccounts', 'installmentAccounts', 'otherAccounts']
       .reduce((total, key) => {
         const group = isObject(summary[key]) ? summary[key] : {};
         return total + (dollarsToCents(group.monthlyPaymentAmount) ?? 0);
       }, 0);
+    const subject = isObject(summary.subject) ? summary.subject : {};
+    const employmentHistory = Array.isArray(subject.employmentHistory) ? subject.employmentHistory : [];
+    const previousAddresses = Array.isArray(subject.previousAddresses) ? subject.previousAddresses : [];
+    const creditScore = isObject(summary.creditScore) ? summary.creditScore : {};
+    const score = typeof creditScore.score === 'number' && Number.isInteger(creditScore.score) && creditScore.score >= 300 && creditScore.score <= 850
+      ? { bureau, model: scoreModel(creditScore.provider), score: creditScore.score }
+      : null;
     return [{
       bureau,
       reportCode: CRS_REPORT_CODE_BY_BUREAU[bureau],
       pulledAt,
       subjectRef: readString(summary, ['id']) ?? readString(root, ['id']) ?? `${bureau}-report`,
-      accounts,
+      accounts: normalizedAccounts,
       inquiries,
+      scores: score === null ? [] : [score],
+      identity: {
+        namesOnFile: readString(subject, ['currentName']) === null ? null : 1,
+        addressesOnFile: readString(subject, ['currentAddress']) === null ? null : 1 + previousAddresses.length,
+        employersOnFile: employmentHistory.length,
+      },
+      summaryCounts: {
+        totalCollections: typeof summary.totalCollections === 'number' && summary.totalCollections >= 0 ? summary.totalCollections : 0,
+        totalPublicRecords: typeof summary.totalPublicRecords === 'number' && summary.totalPublicRecords >= 0 ? summary.totalPublicRecords : 0,
+        totalNegativeAccounts: typeof summary.totalNegativeAccounts === 'number' && summary.totalNegativeAccounts >= 0 ? summary.totalNegativeAccounts : 0,
+      },
       monthlyDebtPaymentsCents,
     }];
   });

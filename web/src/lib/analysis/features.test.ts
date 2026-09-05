@@ -106,15 +106,21 @@ function assertExactShape(features: DerivedFeatures): void {
     'accounts',
     'averageAgeMonths',
     'bureausPulled',
+    'collectionsCount',
     'computedAt',
     'dti',
     'flags',
     'highestRevolvingLimitCents',
+    'identity',
+    'inquiries',
     'inquiriesByBureau',
+    'lateAccountsCount',
     'negativesCount',
     'openRevolvingCount',
     'overallUtilizationPct',
+    'publicRecordsCount',
     'schemaVersion',
+    'scores',
   ]);
   assert.deepEqual(Object.keys(features.dti).sort(), [
     'monthlyDebtPaymentsCents',
@@ -124,8 +130,12 @@ function assertExactShape(features: DerivedFeatures): void {
   assert.deepEqual(Object.keys(features.flags).sort(), [
     'averageAgeTwoYearsOrMore',
     'cardWithTenKLimit',
+    'cleanReport',
     'fourOrMorePersonalAccountsOpen',
+    'noLatePayments',
     'noNegativeItemsReported',
+    'personalInformationConfirmed',
+    'scoreAtLeast700',
     'thinFile',
     'twoOrFewerInquiriesEveryBureau',
     'utilizationUnder30',
@@ -138,7 +148,10 @@ function assertExactShape(features: DerivedFeatures): void {
       'isNegative',
       'isOpen',
       'kind',
+      'label',
+      'lateWithin24Months',
       'limitCents',
+      'pastDueCents',
       'utilizationPct',
     ]);
   }
@@ -160,7 +173,7 @@ describe('extractFeatures persona contract', () => {
     const features = await featuresFor('clean');
 
     assertExactShape(features);
-    assert.equal(features.schemaVersion, 1);
+    assert.equal(features.schemaVersion, 2);
     assert.deepEqual(features.bureausPulled, ['EQF', 'EXP', 'TUC']);
     assert.deepEqual(features.accounts.map((item) => item.accountRef), [
       'account-1',
@@ -182,9 +195,13 @@ describe('extractFeatures persona contract', () => {
       ratioPct: null,
     });
     assert.deepEqual(features.flags, {
+      scoreAtLeast700: true,
+      personalInformationConfirmed: false,
+      cleanReport: true,
       utilizationUnder30: true,
       fourOrMorePersonalAccountsOpen: true,
       averageAgeTwoYearsOrMore: true,
+      noLatePayments: true,
       noNegativeItemsReported: true,
       cardWithTenKLimit: true,
       twoOrFewerInquiriesEveryBureau: true,
@@ -241,12 +258,18 @@ describe('extractFeatures persona contract', () => {
 
     assertExactShape(features);
     assert.deepEqual(features, {
-      schemaVersion: 1,
+      schemaVersion: 2,
       bureausPulled: [],
       accounts: [],
       overallUtilizationPct: null,
+      scores: [],
+      identity: { namesOnFile: null, addressesOnFile: null, employersOnFile: null },
+      inquiries: [],
       inquiriesByBureau: { EQF: 0, EXP: 0, TUC: 0 },
       negativesCount: 0,
+      lateAccountsCount: 0,
+      collectionsCount: 0,
+      publicRecordsCount: 0,
       openRevolvingCount: 0,
       averageAgeMonths: null,
       highestRevolvingLimitCents: null,
@@ -256,12 +279,16 @@ describe('extractFeatures persona contract', () => {
         ratioPct: null,
       },
       flags: {
+        scoreAtLeast700: false,
+        personalInformationConfirmed: false,
+        cleanReport: false,
         utilizationUnder30: false,
         fourOrMorePersonalAccountsOpen: false,
         averageAgeTwoYearsOrMore: false,
-        noNegativeItemsReported: false,
+        noLatePayments: true,
+        noNegativeItemsReported: true,
         cardWithTenKLimit: false,
-        twoOrFewerInquiriesEveryBureau: false,
+        twoOrFewerInquiriesEveryBureau: true,
         thinFile: true,
       },
       computedAt: CLOCK_INSTANT,
@@ -457,11 +484,11 @@ describe('extractFeatures boundary rules', () => {
       inquiries: 2,
     }));
 
-    assert.equal(boundary.flags.utilizationUnder30, true);
+    assert.equal(boundary.flags.utilizationUnder30, false);
     assert.equal(boundary.overallUtilizationPct, 2.7);
     assert.equal(boundary.flags.fourOrMorePersonalAccountsOpen, true);
     assert.equal(boundary.flags.averageAgeTwoYearsOrMore, true);
-    assert.equal(boundary.flags.noNegativeItemsReported, true);
+    assert.equal(boundary.flags.noNegativeItemsReported, undefined);
     assert.equal(boundary.flags.cardWithTenKLimit, true);
     assert.equal(boundary.flags.twoOrFewerInquiriesEveryBureau, true);
     assert.equal(boundary.flags.thinFile, false);
@@ -482,7 +509,7 @@ describe('extractFeatures boundary rules', () => {
     assert.equal(failing.flags.utilizationUnder30, false);
     assert.equal(failing.flags.fourOrMorePersonalAccountsOpen, false);
     assert.equal(failing.flags.averageAgeTwoYearsOrMore, false);
-    assert.equal(failing.flags.noNegativeItemsReported, false);
+    assert.equal(failing.flags.noNegativeItemsReported, undefined);
     assert.equal(failing.flags.cardWithTenKLimit, false);
     assert.equal(failing.flags.twoOrFewerInquiriesEveryBureau, false);
     assert.equal(failing.flags.thinFile, true);

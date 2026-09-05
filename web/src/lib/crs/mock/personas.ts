@@ -74,12 +74,18 @@ export interface MockAccount {
   readonly isOpen: boolean;
   /** A negative item is REPORTED on this account. A readiness state, never an action. */
   readonly isNegative: boolean;
+  /** Provider display label, deliberately synthetic and bounded like the sandbox projection. */
+  readonly label?: string | null;
+  readonly pastDueCents?: number;
+  readonly lateWithin24Months?: boolean;
 }
 
 /** One inquiry. `monthsAgo` is relative for the same reason `ageMonths` is. */
 export interface MockInquiry {
   readonly inquiryRef: string;
   readonly monthsAgo: number;
+  readonly reportedAt?: string;
+  readonly matchedNewAccountWithin45Days?: boolean;
 }
 
 /**
@@ -98,6 +104,9 @@ export interface MockBureauRecord {
   readonly subjectRef: string;
   readonly accounts: readonly MockAccount[];
   readonly inquiries: readonly MockInquiry[];
+  readonly scores: readonly { bureau: BureauCode; model: string; score: number }[];
+  readonly identity: { readonly namesOnFile: number | null; readonly addressesOnFile: number | null; readonly employersOnFile: number | null };
+  readonly summaryCounts: { readonly totalCollections: number; readonly totalPublicRecords: number; readonly totalNegativeAccounts: number };
   /** The DTI numerator input. The income side is consumer-stated and is not a bureau field. */
   readonly monthlyDebtPaymentsCents: number;
 }
@@ -323,13 +332,30 @@ export function buildMockBureauRecord(
 
   const omitted = new Set(variant.omittedAccountRefs);
 
+  const accounts = fixture.accounts.filter((account) => !omitted.has(account.accountRef)).map((account) => ({
+    ...account,
+    label: account.label ?? account.accountRef.replace(/^mock-acct-/, '').toUpperCase(),
+    pastDueCents: account.pastDueCents ?? 0,
+    lateWithin24Months: account.lateWithin24Months ?? false,
+  }));
   return {
     bureau,
     reportCode: CRS_REPORT_CODE_BY_BUREAU[bureau],
     pulledAt: now.toISOString(),
     subjectRef: fixture.subjectRef,
-    accounts: fixture.accounts.filter((account) => !omitted.has(account.accountRef)),
-    inquiries: fixture.inquiryPool.slice(0, variant.inquiryCount),
+    accounts,
+    inquiries: fixture.inquiryPool.slice(0, variant.inquiryCount).map((inquiry) => ({
+      ...inquiry,
+      reportedAt: inquiry.reportedAt ?? new Date(now.getTime() - inquiry.monthsAgo * 30.4375 * 24 * 60 * 60 * 1000).toISOString(),
+      matchedNewAccountWithin45Days: inquiry.matchedNewAccountWithin45Days ?? false,
+    })),
+    scores: [{ bureau, model: 'VANTAGE', score: persona === 'clean' ? 740 : persona === 'derog' ? 620 : 680 }],
+    identity: { namesOnFile: 1, addressesOnFile: 1, employersOnFile: 0 },
+    summaryCounts: {
+      totalCollections: persona === 'derog' ? 1 : 0,
+      totalPublicRecords: 0,
+      totalNegativeAccounts: fixture.accounts.filter((account) => account.isNegative).length,
+    },
     monthlyDebtPaymentsCents: fixture.monthlyDebtPaymentsCents,
   };
 }

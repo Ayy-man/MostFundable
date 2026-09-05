@@ -12,7 +12,7 @@ import {
   CRS_SPEC_SMFA_PASS_STATUSES,
   CRS_SPEC_SMFA_PENDING_STATUS,
 } from '../spec-catalog.ts';
-import { createSandboxAdapter, readSandboxConfigFromEnv } from './driver.ts';
+import { createSandboxAdapter, normalizeReportBody, readSandboxConfigFromEnv } from './driver.ts';
 
 import type { CrsMemberRef } from '../types.ts';
 
@@ -69,6 +69,22 @@ function smfaStatusAdapter(status: unknown) {
 }
 
 describe('CRS v3 sandbox boundary', () => {
+  it('normalizes scores, identity, delinquency comments, and the 45-day inquiry match without account numbers', () => {
+    const pulledAt = '2026-09-05T00:00:00.000Z';
+    const body = normalizeReportBody({ providerViews: [{
+      provider: 'EFX', summary: { creditScore: { score: 705, provider: 'VANTAGE' }, subject: { currentName: 'Private', currentAddress: 'Private', previousAddresses: [{}], employmentHistory: [{}] }, totalCollections: 1, totalPublicRecords: 2, totalNegativeAccounts: 3 },
+      revolvingAccounts: [{ id: 'opaque-1', accountName: ' DISCOVER ', accountNumber: 'must-not-leave-provider', accountOpen: true, balanceAmount: { amount: 4200 }, creditLimitAmount: { amount: 5000 }, pastDueAmount: { amount: 0 }, dateOpened: Date.parse('2026-08-20T00:00:00.000Z'), accountStatus: 'PAYS_AS_AGREED', isNegative: false, comments: [{ description: 'LAST REPORTED DELINQUENCIES: 9/2026=R2' }] }],
+      inquiries: [{ id: 'inquiry-1', reportedDate: Date.parse('2026-08-10T00:00:00.000Z') }],
+    }] }, ['EQF1001'], pulledAt) as { perBureau: Array<{ accounts: Array<Record<string, unknown>>; inquiries: Array<Record<string, unknown>>; scores: unknown; identity: unknown; summaryCounts: unknown }> };
+    const row = body.perBureau[0];
+    assert.deepEqual(row.scores, [{ bureau: 'EQF', model: 'VANTAGE', score: 705 }]);
+    assert.deepEqual(row.identity, { namesOnFile: 1, addressesOnFile: 2, employersOnFile: 1 });
+    assert.deepEqual(row.summaryCounts, { totalCollections: 1, totalPublicRecords: 2, totalNegativeAccounts: 3 });
+    assert.equal(row.accounts[0].label, 'DISCOVER');
+    assert.equal(row.accounts[0].lateWithin24Months, true);
+    assert.equal(row.inquiries[0].matchedNewAccountWithin45Days, true);
+    assert.equal(JSON.stringify(body).includes('must-not-leave-provider'), false);
+  });
   it('exposes development verification links only for the registry-selected non-fallback driver', () => {
     const spec = DRIVERS.crs;
     const selected = spec.values.find((value) => value !== spec.fallback);

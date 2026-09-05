@@ -319,10 +319,10 @@ describe('Phase 5 persona and driver matrix', () => {
 
       if (persona === 'derog') {
         assert.ok(mock.persisted.plan);
-        assert.equal(mock.persisted.plan.readinessScore, 33);
+        assert.equal(mock.persisted.plan.readinessScore, 44);
         assert.equal(mock.persisted.plan.readinessScore < 100, true);
         assert.deepEqual(
-          mock.persisted.plan.personalChecklist[2].children.map((child) => ({
+          mock.persisted.plan.personalChecklist[3].children.map((child) => ({
             accountRef: child.accountRef,
             observedUtilizationPct: child.observedUtilizationPct,
           })),
@@ -362,13 +362,13 @@ describe('Phase 5 persona and driver matrix', () => {
   it('keeps both state registries, markers, and duration defaults complete', async () => {
     const outcome = await runPersona('clean', 'mock');
     assert.ok(outcome.persisted.plan);
-    assert.equal(PERSONAL_CHECKLIST_V1.length, 8);
+    assert.equal(PERSONAL_CHECKLIST_V1.length, 10);
     assert.equal(BUSINESS_CHECKLIST_V1.length, 7);
     const states = [
       ...outcome.persisted.plan.personalChecklist,
       ...outcome.persisted.plan.businessChecklist,
     ];
-    assert.equal(states.length, 15);
+    assert.equal(states.length, 17);
     assert.equal(states.every((state) => state.todo === 'TODO(#127)'), true);
     assert.equal(
       Object.values(ACTION_DURATIONS_V1).every(
