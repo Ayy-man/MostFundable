@@ -4,19 +4,14 @@ create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 select plan(29);
 
-select is(
-  (
-    select pg_catalog.count(*)::integer
-    from pg_catalog.pg_constraint as constraint_row
-    join pg_catalog.pg_class as relation on relation.oid = constraint_row.conrelid
-    join pg_catalog.pg_namespace as namespace on namespace.oid = relation.relnamespace
-    where namespace.nspname = 'public'
-      and relation.relname = 'consumer_notification_preferences'
-      and constraint_row.conname = 'consumer_notification_preferences_email_unavailable'
-      and constraint_row.contype = 'c'
-  ),
-  1,
-  'consumer event email stays database-disabled while no dispatcher exists'
+-- Migration 434 lifted the email-unavailable constraint when the consumer dispatcher arrived, and
+-- test 434 owns the replacement assertions. What this file still guards is the in-app half: the
+-- preference row governs creation, dispatch and the feed regardless of the email channel.
+select has_column(
+  'public',
+  'consumer_notification_preferences',
+  'email_enabled',
+  'the email choice is still a durable per-consumer column'
 );
 select has_trigger(
   'public',
@@ -79,20 +74,18 @@ select is(
     where profile_id = '42300000-0000-4000-8000-000000000011'
       and email_enabled
   ),
-  0,
-  'a new consumer has no event-email category enabled'
+  2,
+  'a new consumer is seeded with the two default email categories (migration 434)'
 );
 
-select throws_ok(
+select lives_ok(
   $$
     update public.consumer_notification_preferences
     set email_enabled = true
     where profile_id = '42300000-0000-4000-8000-000000000011'
       and event_type = 'team_message'
   $$,
-  '23514',
-  null,
-  'direct database writes cannot claim unsupported consumer email delivery'
+  'the email choice is writable now that a dispatcher exists'
 );
 
 insert into public.monitoring_events (id, client_id, event_type, occurred_at)
