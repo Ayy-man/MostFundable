@@ -43,6 +43,9 @@ const ADMIN_IMPORTERS = new Set([
   // Phase 21's refund repository is the second narrow billing boundary: it
   // invokes one security-definer observation RPC and performs no direct write.
   "src/lib/billing/repository-refunds.ts",
+  // C2's paid-invoice evidence repository is the third billing boundary: one
+  // security-definer insert of webhook evidence, no read of consumer rows.
+  "src/lib/billing/repository-paid-invoices.ts",
   "src/lib/revenue/repository.ts",
   "src/lib/jobs/repository.ts",
   // Phase 10's two e2e suites, on the same footing as live-chain: they seed and

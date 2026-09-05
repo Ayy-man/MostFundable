@@ -14,8 +14,11 @@ insert into public.orgs(id, name, slug) values
   ('43800000-0000-4000-8000-000000000001', 'Invoice evidence org', 'paid-invoice-evidence');
 insert into public.clients(id, org_id, display_name) values
   ('43800000-0000-4000-8000-000000000002', '43800000-0000-4000-8000-000000000001', 'Invoice evidence client');
+insert into public.consents(id, client_id, kind, text_version, signed_at, ip, esig_ref) values
+  ('43800000-0000-4000-8000-000000000010', '43800000-0000-4000-8000-000000000002', 'monitoring', 'v1', '2026-08-01', '127.0.0.1', 'invoice-evidence'),
+  ('43800000-0000-4000-8000-000000000011', '43800000-0000-4000-8000-000000000002', 'analysis', 'v1', '2026-08-01', '127.0.0.1', 'invoice-evidence');
 insert into public.enrollments(id, client_id, status, monitoring_consent_at, analysis_consent_at, esig_doc_id) values
-  ('43800000-0000-4000-8000-000000000003', '43800000-0000-4000-8000-000000000002', 'active', pg_catalog.now(), pg_catalog.now(), 'invoice-evidence');
+  ('43800000-0000-4000-8000-000000000003', '43800000-0000-4000-8000-000000000002', 'active', '2026-08-01', '2026-08-01', 'invoice-evidence');
 insert into public.consumer_subscriptions(
   client_id, enrollment_id, provider, customer_ref, payment_method_ref, subscription_ref,
   price_ref, price_cents, currency, status, idempotency_key
