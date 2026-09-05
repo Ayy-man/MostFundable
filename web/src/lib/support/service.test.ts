@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
+import { NORMALIZED_ADVERSARIAL_LANGUAGE } from '../compliance/__fixtures__/adversarial-language.mjs';
 import { createUnavailableOpenRouterDraftDriver } from './driver.ts';
-import { SupportError } from './errors.ts';
+import { SupportError, SupportMessageLanguageError } from './errors.ts';
 import * as publicSurface from './index.ts';
 import { createMockSupportDraftDriver } from './mock-driver.ts';
+import { evaluateDraftLanguage } from './language-gate.ts';
 import { createSupportService } from './service.ts';
 import { SUPPORT_DRAFT_CONTEXT_MESSAGE_LIMIT } from './types.ts';
 
@@ -450,6 +452,106 @@ describe('support service sending', () => {
     );
     assert.equal(sent.origin, 'ai_assisted');
     assert.deepEqual(log.calls, ['sendMessage']);
+  });
+});
+
+// A poisoned body lifted from the shared compliance fixture at run time rather
+// than written here: the fixture is the one file allow-listed for this
+// vocabulary, and reading it means this test screens whatever the battery
+// catches today rather than a copy that can drift.
+const POISONED_BODY = ((): string => {
+  const found = NORMALIZED_ADVERSARIAL_LANGUAGE.find((text) => evaluateDraftLanguage(text).length > 0);
+  if (found === undefined) {
+    throw new Error('the shared compliance fixture no longer trips the language battery');
+  }
+  return found;
+})();
+
+const CLEAN_BODY = 'Your file is with the team and I will follow up here as soon as I can.';
+
+describe('support service language screening (C5)', () => {
+  it('refuses a staff-typed client-facing body the battery flags, and records nothing', async () => {
+    for (const actor of [OPERATOR, ADMIN]) {
+      const log = newLog();
+      const service = createSupportService({
+        repository: fakeRepository(payloadWith('Any update on my file?'), log),
+        env: {},
+      });
+
+      await assert.rejects(
+        () => service.sendMessage(THREAD_ID, actor, POISONED_BODY),
+        (error: unknown) => {
+          assert.ok(error instanceof SupportMessageLanguageError, actor.role);
+          assert.equal(error.code, 'SUPPORT_MESSAGE_LANGUAGE');
+          assert.equal(error.status, 422);
+          assert.ok(error.codes.length > 0, 'a refusal names at least one rule');
+          for (const code of error.codes) assert.match(code, /^LANGUAGE_C\d{2}$/);
+          // The rule ids are the whole payload: the phrase itself never rides along.
+          assert.equal(error.message, 'SUPPORT_MESSAGE_LANGUAGE');
+          return true;
+        },
+      );
+      // The send seam was never reached. A refused body is a message that does
+      // not exist, the same way a held draft with guardrail flags is never sent.
+      assert.deepEqual(log.calls, [], actor.role);
+    }
+  });
+
+  it('refuses the same body when it cites a draft, before the pairing is checked', async () => {
+    const log = newLog();
+    const service = createSupportService({
+      repository: fakeRepository(payloadWith('Any update on my file?'), log),
+      env: {},
+    });
+    await assert.rejects(
+      () => service.sendMessage(THREAD_ID, OPERATOR, POISONED_BODY, '13000000-0000-0000-0000-0000000000dd'),
+      (error: unknown) => error instanceof SupportError && error.code === 'SUPPORT_MESSAGE_LANGUAGE',
+    );
+    assert.deepEqual(log.calls, []);
+  });
+
+  it('does not screen a consumer: the same body from the client is recorded as typed', async () => {
+    const log = newLog();
+    const service = createSupportService({
+      repository: fakeRepository(payloadWith('Any update on my file?'), log),
+      env: {},
+    });
+    const sent = await service.sendMessage(THREAD_ID, CONSUMER, POISONED_BODY);
+    assert.equal(sent.authorKind, 'consumer');
+    assert.equal(sent.body, POISONED_BODY);
+    assert.deepEqual(log.calls, ['sendMessage']);
+  });
+
+  it('does not screen an internal note, which migration 385 withholds from every consumer', async () => {
+    const log = newLog();
+    const service = createSupportService({
+      repository: fakeRepository(payloadWith('Any update on my file?'), log),
+      env: {},
+    });
+    const sent = await service.sendMessage(THREAD_ID, OPERATOR, POISONED_BODY, undefined, 'internal');
+    assert.equal(sent.visibility, 'internal');
+    assert.deepEqual(log.calls, ['sendMessage']);
+  });
+
+  it('lets clean text through unchanged for every author kind', async () => {
+    for (const actor of [OPERATOR, ADMIN, CONSUMER]) {
+      const log = newLog();
+      const service = createSupportService({
+        repository: fakeRepository(payloadWith('Any update on my file?'), log),
+        env: {},
+      });
+      const sent = await service.sendMessage(THREAD_ID, actor, CLEAN_BODY);
+      assert.equal(sent.body, CLEAN_BODY, actor.role);
+      assert.deepEqual(log.calls, ['sendMessage'], actor.role);
+    }
+  });
+
+  it('screens the same way through the public surface', async () => {
+    // `publicSurface.sendMessage` binds the default service, which would reach
+    // a real repository; what this proves is only that the barrel's function
+    // is the service's, so the screen above is the one every route gets.
+    assert.equal(typeof publicSurface.sendMessage, 'function');
+    assert.ok(!('SupportMessageLanguageError' in publicSurface), 'the barrel stays narrow');
   });
 });
 

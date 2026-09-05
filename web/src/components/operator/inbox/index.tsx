@@ -459,7 +459,9 @@ export function useOperatorInbox({ active }: { active: boolean }) {
     const reason =
       result.code === "SUPPORT_THREAD_CLOSED"
         ? "This conversation is resolved, so nothing was sent. Reopen it to send this."
-        : "This was not delivered. Nothing reached the client.";
+        : result.code === "SUPPORT_MESSAGE_LANGUAGE"
+          ? "This message contains wording the platform cannot send. Remove the flagged phrase and try again."
+          : "This was not delivered. Nothing reached the client.";
     setPending((current) =>
       current.map((each) => (each.ref === ref ? { ...each, reason, state: "failed" } : each)),
     );

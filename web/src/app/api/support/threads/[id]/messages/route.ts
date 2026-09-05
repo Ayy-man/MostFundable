@@ -1,9 +1,11 @@
 // The one HTTP path that puts a message in a thread.
 //
-// `POST` is the only export. There is no `GET` (messages come back with the
+// `POST` is the only verb. There is no `GET` (messages come back with the
 // thread), no `PUT`, and no batch form, because every extra verb here would be
 // another shape that plan 13-06's scanner has to prove cannot fire without a
 // person behind it. One verb, one caller, one audited RPC underneath.
+// `handleSendMessage` is the same handler with its dependencies handed in, so a
+// test can drive it; `POST` is the only thing that supplies the real ones.
 
 import { featureFlag } from "@/lib/env";
 
@@ -36,6 +38,23 @@ type RouteContext<Path extends "/api/support/threads/[id]/messages"> = Path exte
   ? { params: Promise<{ id: string }> }
   : never;
 
+/**
+ * What the handler needs from the rest of the app, handed in by `POST`.
+ *
+ * The same arrangement the billing routes use: `POST` checks the flag, loads
+ * the real session, wall and support library, and hands them over, so a test
+ * can drive the handler with a fake session and a fake repository and still
+ * exercise the real service, the real language screen and the real error
+ * mapping. `sendMessage` here is the support barrel's export and nothing wider.
+ */
+export interface SendMessageRouteDependencies {
+  readonly getSession: typeof import("@/lib/auth/session").getSession;
+  readonly assertTenantWriteAllowed: typeof import("@/lib/tenancy/wall").assertTenantWriteAllowed;
+  readonly tenantErrorResponse: typeof import("@/lib/tenancy/errors").tenantErrorResponse;
+  readonly sendMessage: typeof import("@/lib/support").sendMessage;
+  readonly toHttpResponse: typeof import("@/lib/support").toHttpResponse;
+}
+
 function invalid() {
   return Response.json(
     { error: "SUPPORT_REQUEST_INVALID" },
@@ -51,9 +70,6 @@ export async function POST(
     return new Response(null, { status: 404, headers: privateHeaders });
   }
 
-  const { id } = await context.params;
-  if (!UUID_PATTERN.test(id)) return invalid();
-
   const [{ getSession }, { assertTenantWriteAllowed }, { tenantErrorResponse }, { sendMessage, toHttpResponse }] = await Promise.all([
     import("@/lib/auth/session"),
     import("@/lib/tenancy/wall"),
@@ -61,14 +77,31 @@ export async function POST(
     import("@/lib/support"),
   ]);
 
-  const session = await getSession();
+  return handleSendMessage(request, context, {
+    assertTenantWriteAllowed,
+    getSession,
+    sendMessage,
+    tenantErrorResponse,
+    toHttpResponse,
+  });
+}
+
+export async function handleSendMessage(
+  request: Request,
+  context: RouteContext<"/api/support/threads/[id]/messages">,
+  deps: SendMessageRouteDependencies,
+) {
+  const { id } = await context.params;
+  if (!UUID_PATTERN.test(id)) return invalid();
+
+  const session = await deps.getSession();
   if (!session) {
     return Response.json(
       { error: "SUPPORT_ACTOR_REQUIRED" },
       { status: 401, headers: privateHeaders },
     );
   }
-  try { await assertTenantWriteAllowed(session); } catch (error) { return tenantErrorResponse(error); }
+  try { await deps.assertTenantWriteAllowed(session); } catch (error) { return deps.tenantErrorResponse(error); }
 
   let payload: unknown;
   try {
@@ -113,7 +146,7 @@ export async function POST(
     // the actor is the session profile. Nothing in the request body reaches
     // either one, so a client cannot post as somebody else even if migration
     // 100's trigger were removed.
-    const message = await sendMessage(
+    const message = await deps.sendMessage(
       id,
       { profileId: session.id, role: session.role },
       body,
@@ -122,7 +155,10 @@ export async function POST(
     );
     return Response.json({ message }, { status: 201, headers: privateHeaders });
   } catch (error) {
-    const { status, body: failure } = toHttpResponse(error);
+    // A language refusal (C5) arrives here as a 422 whose body also carries
+    // the rule ids that fired, so the surface can name the rule without the
+    // response ever repeating the phrase.
+    const { status, body: failure } = deps.toHttpResponse(error);
     return Response.json(failure, { status, headers: privateHeaders });
   }
 }

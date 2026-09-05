@@ -15,7 +15,8 @@
 import { resolveDraftConfidenceThreshold } from './config.ts';
 import { createSupportDraftDriver } from './driver.ts';
 import { runDraftEngine } from './engine.ts';
-import { SupportError, toSupportError } from './errors.ts';
+import { SupportError, SupportMessageLanguageError, toSupportError } from './errors.ts';
+import { evaluateDraftLanguage } from './language-gate.ts';
 import { createSupportRepository } from './repository.ts';
 import { SUPPORT_DRAFT_CONTEXT_MESSAGE_LIMIT } from './types.ts';
 import { resolveGovernedEnv } from '../admin/settings.ts';
@@ -204,17 +205,33 @@ export function createSupportService(deps: SupportServiceDeps = {}): SupportServ
 
     // `async` so that a refused author kind arrives as a rejection rather than
     // a synchronous throw: a caller that only attaches `.catch` must not miss
-    // the one error this function raises before reaching the database.
+    // the errors this function raises before reaching the database.
     // `visibility` is passed through rather than checked here. A consumer
     // asking for an internal note is refused by migration 385 — by the RPC with
     // a named code, and by a check constraint underneath it — and re-deriving
     // the same rule in TypeScript would be a second definition to keep in step,
     // which is the drift this library keeps avoiding on purpose.
+    //
+    // What is checked here is the wording (pre-launch defect C5). An AI draft
+    // cannot be sent with guardrail flags because migration 100's `held_drafts`
+    // constraints refuse it; a person typing the same sentence had no gate at
+    // all. So a staff-authored, client-facing body runs through the same
+    // language battery the drafts do, and a hit is refused before the
+    // repository is touched — nothing is recorded, exactly as a held draft is
+    // never sent. Two exclusions, both from the model rather than invented
+    // here: a consumer is not the regulated speaker, and an `internal` note is
+    // one migration 385 withholds from every consumer by RLS and by the read
+    // RPC, so there is no client to protect from it.
     async sendMessage(threadId, actor, body, draftId, visibility) {
+      const authorKind = authorKindFor(actor);
+      if (authorKind !== 'consumer' && (visibility ?? 'participants') === 'participants') {
+        const codes = evaluateDraftLanguage(body);
+        if (codes.length > 0) throw new SupportMessageLanguageError(codes);
+      }
       return repository.sendMessage({
         threadId,
         actorProfileId: actor.profileId,
-        authorKind: authorKindFor(actor),
+        authorKind,
         body,
         draftId,
         ...(visibility === undefined ? {} : { visibility }),
