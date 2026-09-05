@@ -19,7 +19,7 @@ Passing source checks proves the included mechanism and its automated coverage. 
 ## Remaining before launch
 
 - Establish and prove production payment processing.
-- Establish and prove product email delivery.
+- Product email delivery is live on production through Resend (`mail.mostfundable.com`) since 2026-09-06; one templated send is proven. Watch the first real notification batches in the Resend dashboard.
 - Live credit-data operations are proven against the CRS sandbox (`npm run verify:crs-sandbox`: identity, link, verify, close). Production-host proof still needs the production webhook registered.
 - Privacy erasure is proven end to end against a local stack (real auth provider, real storage bucket, database completion): run `npm run verify:privacy-erasure` in `web/` with `supabase start` up. The proof leaves its own seeded rows behind, so run `supabase db reset --local` before `supabase test db`, whose seed assertions count rows exactly. Production evidence still needs one run against the hosted project.
 - Record monitoring, recovery, and account-ownership evidence.
