@@ -30,6 +30,7 @@ function harness(input: {
   fresh?: boolean;
   markStatusError?: Error;
   operator?: boolean | Error;
+  paidInvoice?: boolean | Error;
   refund?: boolean | Error;
   webhookReady?: boolean;
 }) {
@@ -52,6 +53,11 @@ function harness(input: {
       async parse(raw: string, signature: string | null) {
         calls.push(`parse:${raw}:${signature}`);
         return input.event ?? EVENT;
+      },
+      async recordPaidInvoice() {
+        calls.push("paid-invoice");
+        if (input.paidInvoice instanceof Error) throw input.paidInvoice;
+        return input.paidInvoice ?? false;
       },
       async processConsumer() {
         calls.push("consumer");
@@ -111,6 +117,19 @@ describe("Stripe webhook route", () => {
     });
     assert.equal((await handleStripeWebhook(request(), test.dependencies)).status, 200);
     assert.deepEqual(test.calls, ["webhook-ready", "parse:signed-body:signed", "record", "ops-flag", "refund", "mark:processed"]);
+  });
+
+  it("persists Stripe paid-invoice evidence before routing the event", async () => {
+    const test = harness({ event: { ...EVENT, provider: "stripe" }, operator: false, paidInvoice: true });
+    assert.equal((await handleStripeWebhook(request(), test.dependencies)).status, 200);
+    assert.deepEqual(test.calls.slice(0, 5), ["webhook-ready", "parse:signed-body:signed", "record", "paid-invoice", "ops-flag"]);
+  });
+
+  it("marks a paid invoice claim failed when its evidence cannot persist", async () => {
+    const test = harness({ event: { ...EVENT, provider: "stripe" }, paidInvoice: new Error("database private detail") });
+    assert.equal((await handleStripeWebhook(request(), test.dependencies)).status, 503);
+    assert.deepEqual(test.calls.slice(-2), ["paid-invoice", "mark:failed:paid_invoice_persist_failed"]);
+    assert.equal(test.calls.includes("operator"), false);
   });
 
   it("returns 503 only after an injected refund persistence failure is durably marked", async () => {

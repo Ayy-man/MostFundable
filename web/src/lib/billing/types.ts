@@ -82,11 +82,23 @@ export type ParsedWebhook = {
   currency?: string;
   eventId: string;
   eventType: string;
+  /** Present only on a verified Stripe `invoice.paid` invoice payload. */
+  invoiceAmountPaidCents?: number;
+  /** Present only on a verified Stripe `invoice.paid` invoice payload. */
+  invoicePaidAt?: string;
+  /** The provider invoice identity, never an application-generated receipt. */
+  invoiceRef?: string;
+  /** Present only on a verified Stripe `invoice.paid` invoice payload. */
+  invoicePeriodEnd?: string;
+  /** Present only on a verified Stripe `invoice.paid` invoice payload. */
+  invoicePeriodStart?: string;
   /**
    * Null or absent on an `invoice.payment_failed` means the provider has no
    * further retry scheduled, which is what opens the grace window (D-04).
    */
   nextPaymentAttemptAt?: string | null;
+  /** Identifies which parser produced this event so mock invoices stay mock-only. */
+  provider?: BillingDriver;
   setupIntentRef: string | null;
   subscriptionRef: string | null;
   /** The provider's status string, carried verbatim and never narrowed here. */

@@ -165,6 +165,7 @@ function parsedMockWebhook(
       "next_payment_attempt" in input
         ? mockSeconds(input.next_payment_attempt)
         : undefined,
+    provider: "mock",
     setupIntentRef:
       typeof input.setup_intent === "string" ? input.setup_intent : null,
     // The mock signs a flat envelope rather than Stripe's `data.object` nesting,

@@ -125,7 +125,14 @@ export function createRevenueRepository(client: RevenueRpcClient): RevenueReposi
           if ((provider !== "mock" && provider !== "stripe") || priceCents === null || priceCents < 0) {
             throw new RevenueRepositoryError("REVENUE_INPUT_INVALID");
           }
-          return { provider, priceCents };
+          if (provider === "mock") return { provider, priceCents };
+          const paidInvoiceAmountCents = integer(item, "paid_invoice_amount_cents");
+          const paidInvoiceCount = integer(item, "paid_invoice_count");
+          if (
+            paidInvoiceAmountCents === null || paidInvoiceAmountCents < 0 ||
+            paidInvoiceCount === null || paidInvoiceCount < 0
+          ) throw new RevenueRepositoryError("REVENUE_INPUT_INVALID");
+          return { paidInvoiceAmountCents, paidInvoiceCount, provider, priceCents };
         }),
         operatorOrgId,
         operatorSubscription: subscription ? {
