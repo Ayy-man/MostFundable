@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { handlePostClient } from "./route.ts";
+import { stageTransitionErrorResponse } from "./[id]/route.ts";
 
 const list = readFileSync(new URL("./route.ts", import.meta.url), "utf8");
 const patch = readFileSync(new URL("./[id]/route.ts", import.meta.url), "utf8");
@@ -106,6 +107,18 @@ describe("console client route contracts", () => {
     assert.match(patch, /error\.code === "invalid_assignee"/);
     assert.match(patch, /"assignee_unavailable"/);
     assert.match(patch, /Choose an active team member from this workspace\./);
+  });
+
+  it("returns a readable conflict when the stage routine rejects a skipped manual move", async () => {
+    const response = stageTransitionErrorResponse({ code: "stage_transition_not_allowed" });
+    assert.ok(response);
+    assert.equal(response.status, 409);
+    assert.deepEqual(await response.json(), {
+      error: {
+        code: "stage_transition_not_allowed",
+        message: "A stage can only move forward one step or back one step.",
+      },
+    });
   });
 
   it("checks the child flag before loading the status mutation", () => {

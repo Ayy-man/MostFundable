@@ -23,6 +23,16 @@ function accessStatus(error: unknown): 401 | 402 | 403 | null {
   return error.status === 401 || error.status === 402 || error.status === 403 ? error.status : null;
 }
 
+export function stageTransitionErrorResponse(error: unknown): Response | null {
+  if (typeof error !== "object" || error === null || !("code" in error)) return null;
+  if (error.code !== "stage_transition_not_allowed") return null;
+  return errorResponse(
+    "stage_transition_not_allowed",
+    "A stage can only move forward one step or back one step.",
+    409,
+  );
+}
+
 export async function PATCH(
   request: Request,
   context: RouteContext<"/api/clients/[id]">,
@@ -87,6 +97,8 @@ export async function PATCH(
     if (!client) return errorResponse("client_not_found", "The funding readiness client was not found.", 404);
     return Response.json({ outcome: "updated", client }, { status: 200, headers: privateHeaders });
   } catch (error) {
+    const stageTransitionError = stageTransitionErrorResponse(error);
+    if (stageTransitionError) return stageTransitionError;
     const status = accessStatus(error);
     if (status === 402) return errorResponse("ORG_DEACTIVATED", "This organization is deactivated.", 402);
     if (status) return errorResponse(status === 401 ? "session_required" : "role_forbidden", status === 401 ? "Sign in to update a funding readiness client." : "This account cannot update this funding readiness client.", status);
