@@ -36,7 +36,6 @@ export type JobCadence = "on-demand" | "daily" | "nightly" | "weekly" | "monthly
 
 export type JobName =
   | "crs.alert_batch"
-  | "analysis.schedule_due"
   | "analysis.run"
   | "billing.accruals"
   | "outcomes.refresh_stats"

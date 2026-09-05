@@ -286,9 +286,9 @@ describe("job scheduler and adapters", () => {
     for (const job of derived) {
       assert.equal(isRowIdWindowJob(job), true, `${job} carries a row id in its window`);
     }
-    // The three catalog entries with neither handler nor producer are unbuilt phases, not
+    // The two catalog entries with neither handler nor producer are unbuilt phases, not
     // members of this class: none of them carries a row-id window.
-    for (const job of ["crs.alert_batch", "analysis.schedule_due", "vault.sync_banks"] as const) {
+    for (const job of ["crs.alert_batch", "vault.sync_banks"] as const) {
       assert.equal(isRowIdWindowJob(job), false, `${job} is a dated window, not a row-id window`);
     }
   });

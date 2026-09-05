@@ -11,7 +11,6 @@ import {
 
 const EXPECTED = [
   "crs.alert_batch",
-  "analysis.schedule_due",
   "analysis.run",
   "billing.accruals",
   "outcomes.refresh_stats",
@@ -27,7 +26,7 @@ const EXPECTED = [
 describe("job registry", () => {
   beforeEach(resetJobRegistryForTests);
 
-  it("publishes exactly the frozen twelve-key catalog", () => {
+  it("publishes exactly the frozen eleven-key catalog", () => {
     assert.deepEqual(JOB_NAMES, EXPECTED);
   });
 

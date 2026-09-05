@@ -5,7 +5,6 @@ const DATE = "\\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\\d|3[01])";
 
 export const JOB_DEFINITIONS = {
   "crs.alert_batch": { cadence: "nightly", subject: `org:<uuid> or global`, window: "YYYY-MM-DD" },
-  "analysis.schedule_due": { cadence: "daily", subject: "global", window: "YYYY-MM-DD" },
   "analysis.run": { cadence: "on-demand", subject: "client:<uuid>", window: "run:<analysis_run_id>" },
   "billing.accruals": { cadence: "monthly", subject: "org:<uuid>", window: "YYYY-MM" },
   "outcomes.refresh_stats": { cadence: "on-demand", subject: "bank:<bank_ref> or global", window: "change:<outcome_id>" },
@@ -30,31 +29,29 @@ function matches(pattern: string, value: string): boolean {
 
 export const JOB_SUBJECT_PATTERNS: Readonly<Record<JobName, string>> = Object.freeze({
   "crs.alert_batch": `org:${UUID}|global`,
-    "analysis.schedule_due": "global",
-    "analysis.run": `client:${UUID}`,
-    "billing.accruals": `org:${UUID}`,
-    "outcomes.refresh_stats": "bank:[A-Za-z0-9_.:-]{1,120}|global",
-    "vault.sync_banks": "global",
-    "vault.reimport_kb": "global",
-    "purge.derived": `enrollment:${UUID}`,
-    "purge.uploaded_reports": `upload:${UUID}`,
-    "notifications.dispatch": `client:${UUID}`,
-    "tenancy.trial_expiry": "global",
+  "analysis.run": `client:${UUID}`,
+  "billing.accruals": `org:${UUID}`,
+  "outcomes.refresh_stats": "bank:[A-Za-z0-9_.:-]{1,120}|global",
+  "vault.sync_banks": "global",
+  "vault.reimport_kb": "global",
+  "purge.derived": `enrollment:${UUID}`,
+  "purge.uploaded_reports": `upload:${UUID}`,
+  "notifications.dispatch": `client:${UUID}`,
+  "tenancy.trial_expiry": "global",
   "kpi.rollup": `org:${UUID}|member:${UUID}|platform`,
 });
 
 export const JOB_WINDOW_PATTERNS: Readonly<Record<JobName, string>> = Object.freeze({
   "crs.alert_batch": DATE,
-    "analysis.schedule_due": DATE,
-    "analysis.run": `run:${UUID}`,
-    "billing.accruals": "\\d{4}-(?:0[1-9]|1[0-2])",
-    "outcomes.refresh_stats": `change:${UUID}`,
-    "vault.sync_banks": DATE,
-    "vault.reimport_kb": "\\d{4}-W(?:0[1-9]|[1-4]\\d|5[0-3])",
-    "purge.derived": DATE,
-    "purge.uploaded_reports": DATE,
-    "notifications.dispatch": `notification:${UUID}`,
-    "tenancy.trial_expiry": DATE,
+  "analysis.run": `run:${UUID}`,
+  "billing.accruals": "\\d{4}-(?:0[1-9]|1[0-2])",
+  "outcomes.refresh_stats": `change:${UUID}`,
+  "vault.sync_banks": DATE,
+  "vault.reimport_kb": "\\d{4}-W(?:0[1-9]|[1-4]\\d|5[0-3])",
+  "purge.derived": DATE,
+  "purge.uploaded_reports": DATE,
+  "notifications.dispatch": `notification:${UUID}`,
+  "tenancy.trial_expiry": DATE,
   "kpi.rollup": DATE,
 });
 
