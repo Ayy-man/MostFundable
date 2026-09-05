@@ -287,7 +287,14 @@ const REASONING_HEADROOM_TOKENS = 256;
  * `low` — slower and dearer, the exact opposite of the intent. It is only
  * correct alongside a model that does not reason at all.
  */
-export type ReasoningSetting = "low" | "off";
+/**
+ * R5E. `high` was added for the narrative driver, whose model and job are the opposite of every
+ * other caller's: `openai/gpt-5.6-luna` writing several paragraphs of founder-voice prose from a
+ * facts pack, where the 2026-09-05 comparison measured high effort as the setting that produced
+ * accurate copy. It is never right for the extraction and verdict operations above, and a caller
+ * that reaches for it there is buying reasoning tokens it will not use.
+ */
+export type ReasoningSetting = "low" | "high" | "off";
 
 export const PROVIDER_SORTS = Object.freeze(["throughput", "latency", "price"] as const);
 export type ProviderSort = (typeof PROVIDER_SORTS)[number];

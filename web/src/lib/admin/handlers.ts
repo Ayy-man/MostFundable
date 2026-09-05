@@ -68,6 +68,7 @@ const defaults: AdminHandlerDependencies = {
   },
   async fallbackFor(key) {
     if (key === "funding-readiness-plan") return (await import("@/lib/llm/prompts/plan-v1")).PLAN_EMBEDDED_PROMPT;
+    if (key === "funding-readiness-narrative") return (await import("@/lib/llm/narrative/prompt")).NARRATIVE_EMBEDDED_PROMPT;
     return (await import("@/lib/support/prompt")).SUPPORT_DRAFT_EMBEDDED_PROMPT;
   },
   async listEvalRuns(filters) { return (await import("./evals.ts")).listEvalRuns(filters); },

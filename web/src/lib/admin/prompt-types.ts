@@ -1,6 +1,6 @@
 import type { EnvSource } from "@/lib/env";
 
-export const PROMPT_KEYS = ["funding-readiness-plan", "support-draft"] as const;
+export const PROMPT_KEYS = ["funding-readiness-plan", "funding-readiness-narrative", "support-draft"] as const;
 export type PromptKey = (typeof PROMPT_KEYS)[number];
 
 /**
@@ -15,6 +15,7 @@ export type PromptKey = (typeof PROMPT_KEYS)[number];
  */
 export const MANDATORY_PROMPT_EVALUATORS = Object.freeze({
   "funding-readiness-plan": Object.freeze(["plan.supervisor", "plan.deterministic"]),
+  "funding-readiness-narrative": Object.freeze(["narrative.grounding", "narrative.language"]),
   "support-draft": Object.freeze(["support.supervisor", "support.language", "support.confidence"]),
 } as const);
 

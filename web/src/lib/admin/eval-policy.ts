@@ -4,6 +4,8 @@ import { cleanFeatures, derogFeatures } from "@/lib/llm/__fixtures__/features";
 import { OPENROUTER_MODEL } from "@/lib/llm/openrouter-driver";
 import { MOCK_PLAN_MODEL } from "@/lib/llm/mock-driver";
 import { MOCK_SUPPORT_DRAFT_MODEL } from "@/lib/support/mock-driver";
+import { MOCK_NARRATIVE_MODEL, narrativeModelFrom } from "@/lib/llm/narrative/models";
+import { NARRATIVE_REFERENCE_DATASET } from "@/lib/llm/narrative/reference-pack";
 import {
   resolveDriverFromSpecWithDeprecatedSelector,
   type DriverSpec,
@@ -39,8 +41,9 @@ export function evaluationDatasetHash(value: unknown): string {
   return `sha256:${createHash("sha256").update(JSON.stringify(value)).digest("hex")}`;
 }
 
-export const EVAL_REFERENCE_DATASET_HASHES = Object.freeze({
+export const EVAL_REFERENCE_DATASET_HASHES: Readonly<Record<PromptKey, string>> = Object.freeze({
   "funding-readiness-plan": evaluationDatasetHash(PLAN_REFERENCE_DATASET),
+  "funding-readiness-narrative": evaluationDatasetHash(NARRATIVE_REFERENCE_DATASET),
   "support-draft": evaluationDatasetHash(SUPPORT_REFERENCE_DATASET),
 });
 
@@ -73,11 +76,17 @@ export function resolveEvalDriver(env: EnvSource = process.env): EvalDriverName 
 
 export function promptEvaluationIdentity(key: PromptKey, env: EnvSource = process.env) {
   const driver = resolveEvalDriver(env);
+  // The narrative lane runs its own model rather than the transport constant every other
+  // operation shares, so its live identity is whatever `NARRATIVE_MODEL` selects. Recording
+  // `OPENROUTER_MODEL` for it would bind the evidence to a model that never wrote the narrative,
+  // and `admin_activate_prompt_version` compares the recorded model against the running one.
   const model = driver === "openrouter"
-    ? OPENROUTER_MODEL
+    ? (key === "funding-readiness-narrative" ? narrativeModelFrom(env) : OPENROUTER_MODEL)
     : key === "funding-readiness-plan"
       ? MOCK_PLAN_MODEL
-      : MOCK_SUPPORT_DRAFT_MODEL;
+      : key === "funding-readiness-narrative"
+        ? MOCK_NARRATIVE_MODEL
+        : MOCK_SUPPORT_DRAFT_MODEL;
   return Object.freeze({
     driver,
     model,
