@@ -88,7 +88,7 @@ describe("parse delete upload", () => {
     const result = await uploadCreditReport(input, { parser: createCreditReportParser("fixture"), repository: test.repository, id: () => ID });
     assert.equal(result.status, "queued");
     assert.deepEqual(test.events, ["metadata", "storage", "stored", "download", "parsed", "delete", "absence", "atomic"]);
-    assert.equal((await loadParsedUploadFeatures(CLIENT, ID, test.repository))?.schemaVersion, 1);
+    assert.equal((await loadParsedUploadFeatures(CLIENT, ID, test.repository))?.schemaVersion, 2);
   });
 
   it("returns delete_pending with zero enqueue when source clearing fails", async () => {

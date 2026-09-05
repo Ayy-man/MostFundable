@@ -328,7 +328,7 @@ describe('analysis queue worker', () => {
 
   for (const expectation of [
     { persona: 'clean' as const, score: 99, planCount: 1 },
-    { persona: 'derog' as const, score: 33, planCount: 1 },
+    { persona: 'derog' as const, score: 44, planCount: 1 },
     { persona: 'no_hit' as const, score: 0, planCount: 0 },
   ]) {
     it(`persists the ${expectation.persona} outcome through the module-shaped mock boundary`, async () => {

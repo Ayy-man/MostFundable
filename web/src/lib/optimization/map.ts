@@ -5,6 +5,7 @@ import {
 } from "../llm/checklist-seeds.ts";
 import { readinessLabelFor } from "../llm/evaluator.ts";
 import { accountStates } from "../llm/mock-driver.ts";
+import { parseNarrativeV1 } from "./narrative-guard.ts";
 
 import type { AccountFeature, DerivedFeatures } from "../analysis/features.ts";
 import type { ChecklistStateV1, FundingReadinessPlanV1 } from "../llm/types.ts";
@@ -35,16 +36,18 @@ export const UTILIZATION_TARGET_PCT = 30 as const;
 export const BUSINESS_ROLLUP_TEMPLATE_KEY_V1 = "business-profile-complete" as const;
 
 /**
- * The eight personal factor keys, in the order the Optimization view lists them (feedback #172).
+ * The founder's ten personal factor keys, in checklist order.
  * The engine's seed order already matches; this constant makes the dependency explicit so a
  * future reorder of the seeds fails the ordering test rather than silently reshuffling the view.
  */
 export const CONSUMER_PERSONAL_FACTOR_ORDER_V1 = [
+  "credit_score_700",
   "personal_information_confirmed",
-  "overall_report_ready",
+  "clean_report",
   "utilization_under_30",
   "four_personal_accounts_open",
   "average_age_two_years",
+  "no_late_payments",
   "no_negative_items_reported",
   "personal_card_ten_k_limit",
   "inquiries_within_bureau_limit",
@@ -59,11 +62,13 @@ export const CONSUMER_PERSONAL_FACTOR_ORDER_V1 = [
 export const CONSUMER_PERSONAL_FACTOR_TITLES_V1: Readonly<
   Record<(typeof CONSUMER_PERSONAL_FACTOR_ORDER_V1)[number], string>
 > = Object.freeze({
+  credit_score_700: "Credit score 700 or higher",
   average_age_two_years: "Average credit age across all accounts 2+ years",
   four_personal_accounts_open: "Minimum 4 personal credit accounts open",
   inquiries_within_bureau_limit: "Max 2 inquiries on each bureau",
   no_negative_items_reported: "No negative items",
-  overall_report_ready: "Clean report",
+  clean_report: "Clean report",
+  no_late_payments: "No late payments reported",
   personal_card_ten_k_limit: "Minimum 1 personal credit card with limit $10k+",
   personal_information_confirmed: "Correct personal information",
   utilization_under_30: "Utilization under 30%",
@@ -150,8 +155,19 @@ export interface ConsumerChecklistStateRow {
 
 export interface ConsumerOptimizationSourceV1 {
   readonly clientId: string;
-  /** The latest `plans` row, or null when the client has none. `body` is unvalidated jsonb. */
-  readonly plan: { readonly body: unknown; readonly readinessScore: number } | null;
+  /**
+   * The latest `plans` row, or null when the client has none. `body` is unvalidated jsonb.
+   *
+   * `narrative` is the same row's `plans.narrative`, also unvalidated. It is OPTIONAL rather than
+   * nullable because a database that predates migration 435 has no such column, so the read cannot
+   * select it and hands back a row with the property absent; the guard treats absent and null
+   * alike.
+   */
+  readonly plan: {
+    readonly body: unknown;
+    readonly readinessScore: number;
+    readonly narrative?: unknown;
+  } | null;
   /** The latest `analysis_runs` row, or null when nothing has been analyzed. */
   readonly run: {
     readonly ranAt: string;
@@ -198,9 +214,7 @@ export function isDerivedFeaturesBody(value: unknown): value is DerivedFeatures 
   if (!Array.isArray(value.accounts)) return false;
   const flags = value.flags;
   if (!isRecord(flags)) return false;
-  return PERSONAL_CHECKLIST_V1.every(
-    (seed) => seed.evidenceFlag === null || typeof flags[seed.evidenceFlag] === "boolean",
-  );
+  return value.schemaVersion === 1 || value.schemaVersion === 2;
 }
 
 function utilizationAccount(account: AccountFeature): UtilizationAccountV1 {
@@ -238,6 +252,14 @@ function signalFor(key: string, features: DerivedFeatures): string | null {
   const openAccountCount = features.accounts.filter((account) => account.isOpen).length;
   const highestInquiries = Math.max(0, ...Object.values(features.inquiriesByBureau ?? {}));
   switch (key) {
+    case "credit_score_700": {
+      const scores = features.scores ?? [];
+      return scores.length === 0 ? null : `Lowest pulled bureau score is ${Math.min(...scores.map((score) => score.score))}, target 700 or higher`;
+    }
+    case "personal_information_confirmed":
+      return null;
+    case "clean_report":
+      return features.identity === undefined ? null : `${features.identity.addressesOnFile ?? 0} addresses and ${features.identity.employersOnFile ?? 0} employers are reported, target 1 address and 0 employers`;
     case "utilization_under_30":
       return features.overallUtilizationPct === null
         ? null
@@ -248,6 +270,8 @@ function signalFor(key: string, features: DerivedFeatures): string | null {
       return features.averageAgeMonths === null
         ? null
         : `Average account age is ${features.averageAgeMonths} months, target 24 months or more`;
+    case "no_late_payments":
+      return features.lateAccountsCount === undefined ? null : `${features.lateAccountsCount} late-payment accounts are reported, target 0`;
     case "no_negative_items_reported":
       return features.negativesCount === 0
         ? "No negative items are reported"
@@ -367,7 +391,8 @@ export function buildConsumerOptimization(
     businessStates = planBody.businessChecklist;
   } else if (features !== null) {
     personalStates = checklistStatesFor(PERSONAL_CHECKLIST_V1, features);
-    personalStates[2] = { ...personalStates[2], children: accountStates(features) };
+    const utilizationIndex = personalStates.findIndex((item) => item.key === "utilization_under_30");
+    if (utilizationIndex >= 0) personalStates[utilizationIndex] = { ...personalStates[utilizationIndex], children: accountStates(features) };
     businessStates = checklistStatesFor(BUSINESS_CHECKLIST_V1, features);
   }
 
@@ -387,6 +412,9 @@ export function buildConsumerOptimization(
           },
     clientId: input.clientId,
     estimatedCompletion: { days: null, label: "TBD" },
+    // Validated here rather than at the query, so every path into this projection — the real read,
+    // a fixture, a test gateway — passes through the one guard.
+    narrative: parseNarrativeV1(input.plan?.narrative),
     provenance,
     readiness,
     readinessLabel:

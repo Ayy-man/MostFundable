@@ -6,6 +6,30 @@ import type { ConsumerOptimizationV1 } from "./types.ts";
 
 export type OptimizationErrorCode = "forbidden" | "read_failed";
 
+/** Postgres `undefined_column`. PostgREST forwards it verbatim on the error body's `code`. */
+const UNDEFINED_COLUMN = "42703";
+
+/**
+ * Did this read fail because the column is not in the database yet, rather than because the read
+ * is broken?
+ *
+ * `plans.narrative` arrives in migration 435, and a deployment whose ledger stops short of it must
+ * still serve the Optimization view. So the narrative select is allowed exactly one fallback: an
+ * `undefined_column` refusal re-runs the query without the column and the consumer gets the view
+ * with no narrative card. Every other error still fails the read, because "the database said no"
+ * and "the database has not been migrated" are different facts and only one of them is benign.
+ *
+ * Matched on the SQLSTATE first and the message only as a backstop, since a PostgREST version that
+ * drops the code still names the column in the message it returns.
+ */
+export function isMissingColumnError(error: unknown, column: string): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const code = "code" in error ? error.code : null;
+  if (code === UNDEFINED_COLUMN) return true;
+  const message = "message" in error && typeof error.message === "string" ? error.message : "";
+  return /column .*does not exist/i.test(message) && message.includes(column);
+}
+
 export class OptimizationDataError extends Error {
   readonly name = "OptimizationDataError";
   readonly code: OptimizationErrorCode;

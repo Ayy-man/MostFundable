@@ -22,12 +22,18 @@ function account(
 
 function baseFeatures(): DerivedFeatures {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     bureausPulled: ['EQF', 'EXP', 'TUC'],
     accounts: [],
     overallUtilizationPct: null,
+    scores: [{ bureau: 'EQF', model: 'VANTAGE', score: 740 }],
+    identity: { namesOnFile: 1, addressesOnFile: 1, employersOnFile: 0 },
+    inquiries: [],
     inquiriesByBureau: { EQF: 0, EXP: 0, TUC: 0 },
     negativesCount: 0,
+    lateAccountsCount: 0,
+    collectionsCount: 0,
+    publicRecordsCount: 0,
     openRevolvingCount: 0,
     averageAgeMonths: null,
     highestRevolvingLimitCents: null,
@@ -37,9 +43,13 @@ function baseFeatures(): DerivedFeatures {
       ratioPct: null,
     },
     flags: {
+      scoreAtLeast700: true,
+      personalInformationConfirmed: false,
+      cleanReport: true,
       utilizationUnder30: false,
       fourOrMorePersonalAccountsOpen: false,
       averageAgeTwoYearsOrMore: false,
+      noLatePayments: true,
       noNegativeItemsReported: false,
       cardWithTenKLimit: false,
       twoOrFewerInquiriesEveryBureau: false,
@@ -65,9 +75,13 @@ export function cleanFeatures(): DerivedFeatures {
   features.averageAgeMonths = 73.5;
   features.highestRevolvingLimitCents = 1_500_000;
   features.flags = {
+    scoreAtLeast700: true,
+    personalInformationConfirmed: false,
+    cleanReport: true,
     utilizationUnder30: true,
     fourOrMorePersonalAccountsOpen: true,
     averageAgeTwoYearsOrMore: true,
+    noLatePayments: true,
     noNegativeItemsReported: true,
     cardWithTenKLimit: true,
     twoOrFewerInquiriesEveryBureau: true,
@@ -94,9 +108,13 @@ export function derogFeatures(): DerivedFeatures {
   features.averageAgeMonths = 34.4;
   features.highestRevolvingLimitCents = 450_000;
   features.flags = {
+    scoreAtLeast700: false,
+    personalInformationConfirmed: false,
+    cleanReport: false,
     utilizationUnder30: false,
     fourOrMorePersonalAccountsOpen: true,
     averageAgeTwoYearsOrMore: true,
+    noLatePayments: false,
     noNegativeItemsReported: false,
     cardWithTenKLimit: false,
     twoOrFewerInquiriesEveryBureau: false,
@@ -118,9 +136,13 @@ export function thinFileFeatures(): DerivedFeatures {
   features.averageAgeMonths = 10;
   features.highestRevolvingLimitCents = 500_000;
   features.flags = {
+    scoreAtLeast700: false,
+    personalInformationConfirmed: false,
+    cleanReport: true,
     utilizationUnder30: true,
     fourOrMorePersonalAccountsOpen: false,
     averageAgeTwoYearsOrMore: false,
+    noLatePayments: true,
     noNegativeItemsReported: true,
     cardWithTenKLimit: false,
     twoOrFewerInquiriesEveryBureau: true,

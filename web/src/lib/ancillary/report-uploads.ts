@@ -22,7 +22,7 @@ function production(): CreditUploadDependencies {
 function validDerived(value: unknown): value is DerivedFeatures {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
   const row = value as Record<string, unknown>;
-  return row.schemaVersion === 1 && Array.isArray(row.bureausPulled) && Array.isArray(row.accounts) && typeof row.computedAt === "string";
+  return (row.schemaVersion === 1 || row.schemaVersion === 2) && Array.isArray(row.bureausPulled) && Array.isArray(row.accounts) && typeof row.computedAt === "string";
 }
 async function removeAndVerify(repository: UploadRepository, bucket: UploadedDocument["bucket"], objectPath: string): Promise<void> {
   try { await repository.remove(bucket, objectPath); } catch { /* verified absence below is authoritative */ }

@@ -95,10 +95,7 @@ export interface InquiryFactV2 {
   readonly inquiryRef: string;
   readonly bureau: 'EQF' | 'EXP' | 'TUC';
   readonly monthsAgo: number;
-  /**
-   * The founder's 45-day rule: an inquiry with no account opened within 45 days of it is one the
-   * consumer can ask the bureau to look at again.
-   */
+  /** The founder's 45-day rule: an inquiry with no account opened within 45 days of it has no matching account and can be reviewed. */
   readonly matchedNewAccountWithin45Days: boolean;
 }
 

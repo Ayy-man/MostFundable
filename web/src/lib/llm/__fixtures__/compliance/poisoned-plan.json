@@ -17,8 +17,16 @@
       "children": []
     },
     {
-      "key": "overall_report_ready",
+      "key": "credit_score_700",
       "title": "Read 609.",
+      "state": "unverified",
+      "blocking": true,
+      "todo": "TODO(#127)",
+      "children": []
+    },
+    {
+      "key": "clean_report",
+      "title": "Clean report",
       "state": "unverified",
       "blocking": true,
       "todo": "TODO(#127)",
@@ -44,6 +52,14 @@
       "key": "average_age_two_years",
       "title": "credit repair service",
       "state": "verified",
+      "blocking": true,
+      "todo": "TODO(#127)",
+      "children": []
+    },
+    {
+      "key": "no_late_payments",
+      "title": "No late payments reported",
+      "state": "unverified",
       "blocking": true,
       "todo": "TODO(#127)",
       "children": []
