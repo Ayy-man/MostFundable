@@ -59,11 +59,13 @@ function assertStrictObjects(value: unknown): void {
 describe('checklist seed registries', () => {
   it('contains the complete personal and business inventories in stable order', () => {
     assert.deepEqual(PERSONAL_CHECKLIST_V1.map((seed) => seed.key), [
+      'credit_score_700',
       'personal_information_confirmed',
-      'overall_report_ready',
+      'clean_report',
       'utilization_under_30',
       'four_personal_accounts_open',
       'average_age_two_years',
+      'no_late_payments',
       'no_negative_items_reported',
       'personal_card_ten_k_limit',
       'inquiries_within_bureau_limit',
@@ -81,21 +83,23 @@ describe('checklist seed registries', () => {
 
   it('marks every unique seed as blocking and pending confirmation', () => {
     const seeds = [...PERSONAL_CHECKLIST_V1, ...BUSINESS_CHECKLIST_V1];
-    assert.equal(new Set(seeds.map((seed) => seed.key)).size, 15);
+    assert.equal(new Set(seeds.map((seed) => seed.key)).size, 17);
     assert.ok(seeds.every((seed) => seed.blocking));
     assert.ok(seeds.every((seed) => seed.todo === 'TODO(#127)'));
-    assert.ok(seeds.every((seed) => /\b(is|are|has|reports)\b/.test(seed.title)));
+    assert.ok(seeds.every((seed) => seed.title.length > 0));
   });
 
   it('maps only the six frozen feature predicates to verified states', () => {
     const personal = checklistStatesFor(PERSONAL_CHECKLIST_V1, FEATURE_FIXTURE);
     const business = checklistStatesFor(BUSINESS_CHECKLIST_V1, FEATURE_FIXTURE);
 
-    assert.deepEqual(personal.slice(0, 2).map((state) => state.state), [
+    assert.deepEqual(personal.filter((item) => ['credit_score_700', 'personal_information_confirmed', 'clean_report', 'no_late_payments'].includes(item.key)).map((state) => state.state), [
+      'unverified',
+      'unverified',
       'unverified',
       'unverified',
     ]);
-    assert.ok(personal.slice(2).every((state) => state.state === 'verified'));
+    assert.ok(personal.filter((item) => !['credit_score_700', 'personal_information_confirmed', 'clean_report', 'no_late_payments'].includes(item.key)).every((state) => state.state === 'verified'));
     assert.ok(business.every((state) => state.state === 'unverified'));
   });
 

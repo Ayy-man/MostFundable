@@ -62,7 +62,7 @@ export const PLAN_CANDIDATE_SCHEMA_V1 = {
         version: { const: 1 },
       },
     },
-    derivedSchemaVersion: { const: 1 },
+    derivedSchemaVersion: { enum: [1, 2] },
     readinessScore: { type: 'integer', minimum: 0, maximum: 100 },
     readinessLabel: {
       type: 'string',
@@ -70,8 +70,8 @@ export const PLAN_CANDIDATE_SCHEMA_V1 = {
     },
     personalChecklist: {
       type: 'array',
-      minItems: 8,
-      maxItems: 8,
+      minItems: 10,
+      maxItems: 10,
       items: CHECKLIST_STATE_SCHEMA,
     },
     businessChecklist: {
@@ -142,7 +142,7 @@ export const PLAN_SUPERVISOR_SCHEMA_V1 = {
 
 export function serializeDerived(features: DerivedFeatures): DerivedFeatures {
   return {
-    schemaVersion: 1,
+    schemaVersion: features.schemaVersion,
     bureausPulled: [...features.bureausPulled],
     accounts: features.accounts.map((account) => ({
       accountRef: account.accountRef,
@@ -151,16 +151,25 @@ export function serializeDerived(features: DerivedFeatures): DerivedFeatures {
       limitCents: account.limitCents,
       utilizationPct: account.utilizationPct,
       ageMonths: account.ageMonths,
+      label: account.label ?? null,
+      pastDueCents: account.pastDueCents ?? 0,
+      lateWithin24Months: account.lateWithin24Months ?? false,
       isOpen: account.isOpen,
       isNegative: account.isNegative,
     })),
     overallUtilizationPct: features.overallUtilizationPct,
+    ...(features.scores === undefined ? {} : { scores: features.scores.map((score) => ({ ...score })) }),
+    ...(features.identity === undefined ? {} : { identity: { ...features.identity } }),
+    ...(features.inquiries === undefined ? {} : { inquiries: features.inquiries.map((inquiry) => ({ ...inquiry })) }),
     inquiriesByBureau: {
       EQF: features.inquiriesByBureau.EQF,
       EXP: features.inquiriesByBureau.EXP,
       TUC: features.inquiriesByBureau.TUC,
     },
     negativesCount: features.negativesCount,
+    ...(features.lateAccountsCount === undefined ? {} : { lateAccountsCount: features.lateAccountsCount }),
+    ...(features.collectionsCount === undefined ? {} : { collectionsCount: features.collectionsCount }),
+    ...(features.publicRecordsCount === undefined ? {} : { publicRecordsCount: features.publicRecordsCount }),
     openRevolvingCount: features.openRevolvingCount,
     averageAgeMonths: features.averageAgeMonths,
     highestRevolvingLimitCents: features.highestRevolvingLimitCents,
@@ -170,9 +179,13 @@ export function serializeDerived(features: DerivedFeatures): DerivedFeatures {
       ratioPct: features.dti.ratioPct,
     },
     flags: {
+      ...(features.flags.scoreAtLeast700 === undefined ? {} : { scoreAtLeast700: features.flags.scoreAtLeast700 }),
+      ...(features.flags.personalInformationConfirmed === undefined ? {} : { personalInformationConfirmed: features.flags.personalInformationConfirmed }),
+      ...(features.flags.cleanReport === undefined ? {} : { cleanReport: features.flags.cleanReport }),
       utilizationUnder30: features.flags.utilizationUnder30,
       fourOrMorePersonalAccountsOpen: features.flags.fourOrMorePersonalAccountsOpen,
       averageAgeTwoYearsOrMore: features.flags.averageAgeTwoYearsOrMore,
+      ...(features.flags.noLatePayments === undefined ? {} : { noLatePayments: features.flags.noLatePayments }),
       noNegativeItemsReported: features.flags.noNegativeItemsReported,
       cardWithTenKLimit: features.flags.cardWithTenKLimit,
       twoOrFewerInquiriesEveryBureau: features.flags.twoOrFewerInquiriesEveryBureau,

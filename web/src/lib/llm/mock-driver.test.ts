@@ -12,7 +12,7 @@ describe('mock plan driver', () => {
 
     assert.equal(plan.readinessScore, 99);
     assert.equal(plan.readinessLabel, 'Near Ready');
-    assert.equal(plan.personalChecklist.filter((item) => item.state === 'unverified').length, 2);
+    assert.equal(plan.personalChecklist.filter((item) => item.state === 'unverified').length, 1);
     assert.equal(plan.businessChecklist.every((item) => item.state === 'unverified'), true);
   });
 
@@ -20,7 +20,7 @@ describe('mock plan driver', () => {
     const plan = deriveReadinessPlan(derogFeatures());
     const utilization = plan.personalChecklist.find((item) => item.key === 'utilization_under_30');
 
-    assert.equal(plan.readinessScore, 33);
+    assert.equal(plan.readinessScore, 22);
     assert.equal(plan.readinessLabel, 'Building Readiness');
     assert.deepEqual(
       utilization?.children.map((item) => item.accountRef),
@@ -34,10 +34,10 @@ describe('mock plan driver', () => {
 
   it('keeps thin-file limiting states unverified', () => {
     const plan = deriveReadinessPlan(thinFileFeatures());
-    assert.equal(plan.readinessScore, 50);
-    assert.equal(plan.personalChecklist[3].state, 'unverified');
+    assert.equal(plan.readinessScore, 56);
     assert.equal(plan.personalChecklist[4].state, 'unverified');
-    assert.equal(plan.personalChecklist[6].state, 'unverified');
+    assert.equal(plan.personalChecklist[5].state, 'unverified');
+    assert.equal(plan.personalChecklist[8].state, 'unverified');
   });
 
   it('is deeply deterministic for the same derived input', async () => {
@@ -52,20 +52,23 @@ describe('mock plan driver', () => {
   it('rounds every measurable-score boundary and applies the incomplete cap', () => {
     const features = cleanFeatures();
     const keys = [
+      'scoreAtLeast700',
+      'cleanReport',
       'utilizationUnder30',
       'fourOrMorePersonalAccountsOpen',
       'averageAgeTwoYearsOrMore',
+      'noLatePayments',
       'noNegativeItemsReported',
       'cardWithTenKLimit',
       'twoOrFewerInquiriesEveryBureau',
     ] as const;
 
     assert.deepEqual(
-      Array.from({ length: 7 }, (_, enabled) => {
+      Array.from({ length: 10 }, (_, enabled) => {
         for (const [index, key] of keys.entries()) features.flags[key] = index < enabled;
         return computeReadinessScore(features);
       }),
-      [0, 17, 33, 50, 67, 83, 99],
+      [0, 11, 22, 33, 44, 56, 67, 78, 89, 99],
     );
   });
 });

@@ -1,76 +1,32 @@
 import type { DerivedFeatures } from '../analysis/features.ts';
+import { PERSONAL_ITEM_KEYS_V2, PERSONAL_ITEM_TITLES_V2 } from './narrative/contract.ts';
 import type {
   ChecklistSeedV1,
   ChecklistStateV1,
   UnknownCompletionEstimateV1,
 } from './types.ts';
 
-export const PERSONAL_CHECKLIST_V1 = [
-  {
-    key: 'personal_information_confirmed',
-    kind: 'personal_credit',
-    title: 'Personal information is confirmed',
-    blocking: true,
-    todo: 'TODO(#127)',
-    evidenceFlag: null,
-  },
-  {
-    key: 'overall_report_ready',
-    kind: 'personal_credit',
-    title: 'Overall report readiness is confirmed',
-    blocking: true,
-    todo: 'TODO(#127)',
-    evidenceFlag: null,
-  },
-  {
-    key: 'utilization_under_30',
-    kind: 'personal_credit',
-    title: 'Revolving utilization is under 30%',
-    blocking: true,
-    todo: 'TODO(#127)',
-    evidenceFlag: 'utilizationUnder30',
-  },
-  {
-    key: 'four_personal_accounts_open',
-    kind: 'personal_credit',
-    title: 'Four or more personal accounts are open',
-    blocking: true,
-    todo: 'TODO(#127)',
-    evidenceFlag: 'fourOrMorePersonalAccountsOpen',
-  },
-  {
-    key: 'average_age_two_years',
-    kind: 'personal_credit',
-    title: 'Average account age is at least two years',
-    blocking: true,
-    todo: 'TODO(#127)',
-    evidenceFlag: 'averageAgeTwoYearsOrMore',
-  },
-  {
-    key: 'no_negative_items_reported',
-    kind: 'personal_credit',
-    title: 'No negative items are reported',
-    blocking: true,
-    todo: 'TODO(#127)',
-    evidenceFlag: 'noNegativeItemsReported',
-  },
-  {
-    key: 'personal_card_ten_k_limit',
-    kind: 'personal_credit',
-    title: 'A personal revolving account has a limit of at least $10,000',
-    blocking: true,
-    todo: 'TODO(#127)',
-    evidenceFlag: 'cardWithTenKLimit',
-  },
-  {
-    key: 'inquiries_within_bureau_limit',
-    kind: 'personal_credit',
-    title: 'Every bureau reports two or fewer inquiries',
-    blocking: true,
-    todo: 'TODO(#127)',
-    evidenceFlag: 'twoOrFewerInquiriesEveryBureau',
-  },
-] as const satisfies readonly ChecklistSeedV1[];
+const PERSONAL_FLAG_BY_KEY = {
+  credit_score_700: 'scoreAtLeast700',
+  personal_information_confirmed: null,
+  clean_report: 'cleanReport',
+  utilization_under_30: 'utilizationUnder30',
+  four_personal_accounts_open: 'fourOrMorePersonalAccountsOpen',
+  average_age_two_years: 'averageAgeTwoYearsOrMore',
+  no_late_payments: 'noLatePayments',
+  no_negative_items_reported: 'noNegativeItemsReported',
+  personal_card_ten_k_limit: 'cardWithTenKLimit',
+  inquiries_within_bureau_limit: 'twoOrFewerInquiriesEveryBureau',
+} as const;
+
+export const PERSONAL_CHECKLIST_V1 = PERSONAL_ITEM_KEYS_V2.map((key) => ({
+  key,
+  kind: 'personal_credit' as const,
+  title: PERSONAL_ITEM_TITLES_V2[key],
+  blocking: true,
+  todo: 'TODO(#127)' as const,
+  evidenceFlag: PERSONAL_FLAG_BY_KEY[key],
+})) satisfies readonly ChecklistSeedV1[];
 
 export const BUSINESS_CHECKLIST_V1 = [
   {
