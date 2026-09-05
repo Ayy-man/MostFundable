@@ -42,7 +42,7 @@ describe('resolveCrsWidgetOrigin', () => {
   });
 
   it('never returns a host outside the two the spec publishes', () => {
-    const allowed = new Set([DEV_WIDGET, PROD_WIDGET]);
+    const allowed = new Set<string>([DEV_WIDGET, PROD_WIDGET]);
     for (const CRS_BASE_URL of [DEV_API, 'https://evil.example.com/api', undefined]) {
       assert.ok(allowed.has(resolveCrsWidgetOrigin({ CRS_BASE_URL })));
     }

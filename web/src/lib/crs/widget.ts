@@ -50,7 +50,8 @@ export const CRS_WIDGET_ENTRY_PATHS: Readonly<Record<CrsWidgetView, string>> = {
 /** The view we embed on the consumer's My Credit panel. */
 export const CRS_WIDGET_DEFAULT_VIEW: CrsWidgetView = 'all-in-one';
 
-type WidgetEnv = { CRS_BASE_URL?: string | undefined };
+/** Any environment-shaped bag. Written as an index signature so `process.env` assigns cleanly. */
+type WidgetEnv = { readonly [key: string]: string | undefined };
 
 /**
  * Which widget host this deployment talks to.

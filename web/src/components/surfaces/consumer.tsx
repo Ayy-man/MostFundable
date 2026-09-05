@@ -54,6 +54,7 @@ import {
 } from "@/components/consumer/consumer-kit";
 import { JourneyActiveDot, JourneyConnector, JourneyStepIcon, type JourneyStage } from "@/components/consumer/journey-step-icon";
 import { ReadinessRing } from "@/components/consumer/readiness-ring";
+import { ConsumerCreditWidget } from "@/components/consumer/credit-widget";
 import { useCountUp, usePrevious } from "@/lib/motion/hooks";
 import { DurableOptimizationView } from "@/components/consumer/optimization-view";
 import {
@@ -3031,6 +3032,9 @@ function CreditView({
         title="Credit snapshot"
       />
       <SourceStamp className="mb-5">SecureView displays bureau data; MostFundable does not store it.</SourceStamp>
+      {/* The bureau's own widget decides for itself whether to appear: no configured host key,
+          no enrollment or a provider outage all leave the durable reading below untouched. */}
+      {analysisActive ? <ConsumerCreditWidget /> : null}
       {refreshStatusCopy ? (
         <div className="mb-5 flex items-start gap-3 rounded-[10px] border border-[var(--consumer-border)] bg-card px-4 py-3 text-sm" role="status">
           {latestRefresh?.status === "completed" || latestRefresh?.status === "remediated" ? <CheckCircle2 aria-hidden className="mt-0.5 size-4 shrink-0 text-[var(--consumer-positive)]" /> : <RefreshCw aria-hidden className="mt-0.5 size-4 shrink-0 text-muted-foreground" />}
