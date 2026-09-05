@@ -37,9 +37,10 @@ export function createCrsAdapter(
  * R5C-04. Whether repeating a soft pull for the same analysis operation costs nothing.
  *
  * This is the one driver-shaped question the money path has to be able to ask, and it lives here
- * rather than at the caller precisely so that no caller branches on `adapter.driver`. The
- * 2026-08-27 CRS contract serves the latest cached report through GET endpoints; bureau refreshes
- * run on the enrollment schedule rather than on each retrieval, so repeating the read is safe.
+ * rather than at the caller precisely so that no caller branches on `adapter.driver`.
+ *
+ * The driver owns the billing declaration because a GET endpoint alone does not establish that a
+ * repeated retrieval is free. The sandbox has no replay guarantee; the mock is locally cached.
  */
 export function crsPullIsReplaySafe(adapter: CrsAdapter): boolean {
   return adapter.pullBilling === 'cached-read';

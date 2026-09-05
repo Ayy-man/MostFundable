@@ -147,9 +147,8 @@ export interface CreateMemberOptions {
 }
 
 /**
- * Compatibility bag retained for the analysis worker. CRS v3 report retrieval is a cached GET and
- * publishes no idempotency header, so both drivers ignore this value; the worker's durable
- * operation record still owns crash recovery.
+ * Compatibility bag retained for the analysis worker. CRS publishes no idempotency guarantee, so
+ * the sandbox ignores this value; the worker's durable operation record owns crash recovery.
  */
 export interface SoftPullOptions {
   /** Stable for the lifetime of one analysis operation, across every retry of it. */

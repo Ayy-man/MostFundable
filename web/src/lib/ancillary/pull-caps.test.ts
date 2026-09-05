@@ -9,12 +9,25 @@ const ACTOR = "17000000-0000-4000-8000-000000000103";
 function repo(overrides: Partial<AncillaryRepository>): AncillaryRepository { return overrides as AncillaryRepository; }
 
 describe("pull cap service", () => {
-  it("allows every cause without database access while ancillary is off", async () => {
-    for (const cause of ["scheduled", "alert", "upload", "force_pull"] satisfies PullCause[]) {
-      let calls = 0;
-      assert.deepEqual(await assertPullAllowed(CLIENT, cause, SOURCE, { env: {}, repository: repo({ async assertPullAllowed() { calls += 1; return { allowed: false, reason: "count_window" }; } }) }), { allowed: true });
-      assert.equal(calls, 0);
+  it("allows every cause without database access while ancillary is off and warns with UUID-only context", async () => {
+    const warnings: unknown[] = [];
+    const originalWarn = console.warn;
+    console.warn = (warning: unknown) => { warnings.push(warning); };
+    try {
+      for (const cause of ["scheduled", "alert", "upload", "force_pull"] satisfies PullCause[]) {
+        let calls = 0;
+        assert.deepEqual(await assertPullAllowed(CLIENT, cause, SOURCE, { env: {}, repository: repo({ async assertPullAllowed() { calls += 1; return { allowed: false, reason: "count_window" }; } }) }), { allowed: true });
+        assert.equal(calls, 0);
+      }
+    } finally {
+      console.warn = originalWarn;
     }
+    assert.deepEqual(warnings, [
+      { code: "PULL_CAP_BYPASSED_FLAG_OFF", clientId: CLIENT, cause: "scheduled" },
+      { code: "PULL_CAP_BYPASSED_FLAG_OFF", clientId: CLIENT, cause: "alert" },
+      { code: "PULL_CAP_BYPASSED_FLAG_OFF", clientId: CLIENT, cause: "upload" },
+      { code: "PULL_CAP_BYPASSED_FLAG_OFF", clientId: CLIENT, cause: "force_pull" },
+    ]);
   });
 
   it("maps only fixed allowed and blocked results and propagates failures", async () => {
