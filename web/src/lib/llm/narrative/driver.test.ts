@@ -89,8 +89,14 @@ describe('narrative model resolution', () => {
 
   it('asks for high reasoning effort only on the OpenAI family', () => {
     assert.equal(narrativeReasoningFor('openai/gpt-5.6-luna'), 'high');
-    assert.equal(narrativeReasoningFor('anthropic/claude-sonnet-5'), undefined);
     assert.equal(narrativeReasoningFor('openai-community/something'), undefined);
+  });
+
+  it('turns reasoning off for Anthropic, which cannot route with it', () => {
+    // Not a preference. Anthropic needs temperature 1 for extended thinking, the transport pins
+    // temperature 0, and `require_parameters` turns that contradiction into an empty provider set.
+    assert.equal(narrativeReasoningFor('anthropic/claude-sonnet-5'), 'off');
+    assert.equal(narrativeReasoningFor('anthropic/claude-haiku-4.5'), 'off');
   });
 });
 
@@ -242,7 +248,7 @@ describe('openrouter narrative driver', () => {
 
     const body = sent as unknown as Record<string, unknown>;
     assert.equal(body.model, NARRATIVE_DEFAULT_MODEL);
-    assert.deepEqual(body.reasoning, { effort: 'high' });
+    assert.deepEqual(body.reasoning, { effort: 'high', exclude: true });
     // The transport adds its own reasoning headroom on top of the caller's answer budget.
     assert.ok((body.max_tokens as number) >= NARRATIVE_MAX_TOKENS, 'the answer budget survives');
     const format = body.response_format as { json_schema: { strict: boolean; schema: { additionalProperties: boolean } } };
@@ -253,7 +259,23 @@ describe('openrouter narrative driver', () => {
     assert.equal(NARRATIVE_TIME_LIMIT_MS, 120_000);
   });
 
-  it('omits the reasoning block for a model outside the OpenAI family', async () => {
+  it('keeps the reasoning trace out of the response body', async () => {
+    // Measured: 70.1 KB of body at high effort, 33.7 KB of it trace, against a 64 KB cap. Nothing
+    // reads the trace, so the narrative asks for it not to be sent.
+    let sent: Record<string, unknown> | null = null;
+    const driver = createOpenRouterNarrativeDriver({
+      apiKey: 'key-value',
+      model: NARRATIVE_DEFAULT_MODEL,
+      async fetch(_url, init) {
+        sent = JSON.parse(String((init as RequestInit).body));
+        return new Response(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: '{}' } }] }), { status: 200 });
+      },
+    });
+    await driver.write(tinyPack(), PROMPT).catch(() => undefined);
+    assert.deepEqual((sent as unknown as Record<string, unknown>).reasoning, { effort: 'high', exclude: true });
+  });
+
+  it('sends no reasoning block at all for an Anthropic model', async () => {
     let sent: Record<string, unknown> | null = null;
     const driver = createOpenRouterNarrativeDriver({
       apiKey: 'key-value',
@@ -264,9 +286,23 @@ describe('openrouter narrative driver', () => {
       },
     });
     await driver.write(tinyPack(), PROMPT).catch(() => undefined);
+    assert.equal((sent as unknown as Record<string, unknown>).reasoning, undefined);
+  });
+
+  it('omits the reasoning block for a model outside the OpenAI family', async () => {
+    let sent: Record<string, unknown> | null = null;
+    const driver = createOpenRouterNarrativeDriver({
+      apiKey: 'key-value',
+      model: 'meta-llama/llama-4-70b',
+      async fetch(_url, init) {
+        sent = JSON.parse(String((init as RequestInit).body));
+        return new Response(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: '{}' } }] }), { status: 200 });
+      },
+    });
+    await driver.write(tinyPack(), PROMPT).catch(() => undefined);
     // Absent the caller's setting the transport applies its own default, which is `low` — what must
     // not happen is this lane sending `high` to a model that was never measured at it.
-    assert.deepEqual((sent as unknown as Record<string, unknown>).reasoning, { effort: 'low' });
+    assert.deepEqual((sent as unknown as Record<string, unknown>).reasoning, { effort: 'low', exclude: true });
   });
 
   it('refuses to exist without an API key', () => {

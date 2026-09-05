@@ -28,13 +28,35 @@ export function narrativeModelFrom(env: EnvSource): string {
 }
 
 /**
- * High effort for the OpenAI family, and the transport's own default for everything else.
+ * The reasoning setting per model family, which `provider.require_parameters` makes a routing
+ * decision rather than a quality one.
  *
- * `provider.require_parameters` is true, so sending a reasoning block to a model that does not
- * reason can empty the candidate provider set and fail the request outright. The narrative's
- * default is an OpenAI reasoning model and the comparison was run at high effort; a model pointed
- * at by `NARRATIVE_MODEL` outside that family keeps whatever the transport would have sent.
+ * OpenAI: `high`, which is what the 2026-09-05 comparison measured this job on.
+ *
+ * Anthropic: `off`, and not as a preference. Anthropic requires `temperature: 1` when extended
+ * thinking is on, and `chat-transport.ts` pins `temperature: 0` for every caller; with
+ * `require_parameters: true` telling OpenRouter to route only to providers that support every
+ * parameter sent, the two together leave no candidate endpoint and the request comes back 404 "No
+ * endpoints found that can handle the requested parameters" (measured 2026-09-05 on
+ * `anthropic/claude-sonnet-5`). Omitting the block is the only setting that routes at all.
+ *
+ * Anything else keeps the transport's own default, which is `low`.
  */
-export function narrativeReasoningFor(model: string): 'high' | undefined {
-  return model.startsWith('openai/') ? 'high' : undefined;
+export function narrativeReasoningFor(model: string): 'high' | 'off' | undefined {
+  if (model.startsWith('openai/')) return 'high';
+  if (model.startsWith('anthropic/')) return 'off';
+  return undefined;
+}
+
+/**
+ * Whether this model's ZDR endpoints refuse to be routed to when `temperature` is present.
+ *
+ * Anthropic's, measured 2026-09-05: `anthropic/claude-sonnet-5` 404s "No endpoints found that can
+ * handle the requested parameters" with `temperature` at 0 or at 1 under `require_parameters`, and
+ * routes to Amazon Bedrock under full ZDR the moment the parameter is dropped. The narrative can
+ * afford to drop it — its correctness guarantee is the grounding checker, not a reproducible
+ * sample — so this is a routing fix rather than a change of sampling policy.
+ */
+export function narrativeOmitsTemperature(model: string): boolean {
+  return model.startsWith('anthropic/');
 }

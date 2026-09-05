@@ -34,6 +34,7 @@ import {
   NARRATIVE_DEFAULT_MODEL,
   NARRATIVE_DRIVER_SPEC,
   narrativeModelFrom,
+  narrativeOmitsTemperature,
   narrativeReasoningFor,
 } from './models.ts';
 
@@ -52,6 +53,7 @@ export {
   NARRATIVE_DEFAULT_MODEL,
   NARRATIVE_DRIVER_SPEC,
   narrativeModelFrom,
+  narrativeOmitsTemperature,
   narrativeReasoningFor,
 };
 
@@ -176,6 +178,12 @@ export function createOpenRouterNarrativeDriver(
     apiKey: options.apiKey,
     model,
     ...(reasoning === undefined ? {} : { reasoning }),
+    // The narrative is the largest answer any caller asks this transport for, and a reasoning
+    // trace beside it pushes the response body past the 64 KB cap: measured at 70.1 KB on
+    // `gpt-oss-120b` at high effort, 33.7 KB of it trace and none of it answer. Nothing reads the
+    // trace, so it does not need to be sent.
+    excludeReasoning: true,
+    omitTemperature: narrativeOmitsTemperature(model),
     fetch: options.fetch,
     sleep: options.sleep,
     now: options.now,

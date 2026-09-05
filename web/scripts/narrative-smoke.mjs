@@ -59,6 +59,7 @@ const prompt = { ...NARRATIVE_EMBEDDED_PROMPT, source: 'embedded' };
 let attempts = 0;
 let verdict = null;
 let codes = ['NARRATIVE_DRIVER_FAILED'];
+const perAttempt = [];
 for (let attempt = 0; attempt < 2; attempt += 1) {
   attempts += 1;
   let narrative;
@@ -67,16 +68,34 @@ for (let attempt = 0; attempt < 2; attempt += 1) {
   } catch (error) {
     const status = typeof error?.status === 'number' ? error.status : 'none';
     codes = [`DRIVER_THREW:${error instanceof Error ? error.message : 'unknown'}:status=${status}`];
+    perAttempt.push(codes[0]);
     continue;
   }
   const result = checkNarrative(narrative, pack);
   codes = result.codes;
+  perAttempt.push(result.approved ? 'approved' : result.codes.join('+'));
+  if (!result.approved && result.codes.includes('NUMBER_UNGROUNDED') && process.env.DIAGNOSE) {
+    // The fixture packs are synthetic, so naming the offending token is safe here.
+    const { allowedNumbers } = await import('../src/lib/llm/narrative/grounding.ts');
+    const allowed = allowedNumbers(pack);
+    const prose = [narrative.verdict, narrative.whereYouStand,
+      ...narrative.nextSteps.flatMap((step) => [step.title, step.detail]),
+      ...Object.values(narrative.itemNotes), narrative.businessSide, narrative.timeline.reason];
+    for (const field of prose) {
+      for (const match of field.matchAll(/\d[\d,]*(?:\.\d+)?/g)) {
+        if (!allowed.has(match[0].replace(/,/g, ''))) {
+          console.log(`  ungrounded ${JSON.stringify(match[0])} in: ${field.slice(0, 150)}`);
+        }
+      }
+    }
+  }
   verdict = narrative.verdict;
   if (result.approved) {
     console.log(JSON.stringify({
       scenario,
       model: driver.model,
       attempts,
+      perAttempt,
       passed: true,
       codes: [],
       verdict,
@@ -88,5 +107,5 @@ for (let attempt = 0; attempt < 2; attempt += 1) {
   }
 }
 
-console.log(JSON.stringify({ scenario, model: driver.model, attempts, passed: false, codes, verdict }));
+console.log(JSON.stringify({ scenario, model: driver.model, attempts, perAttempt, passed: false, codes, verdict }));
 process.exit(1);
