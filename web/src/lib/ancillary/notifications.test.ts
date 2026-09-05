@@ -50,8 +50,44 @@ describe("ancillary notification", () => {
       async readDispatchEnvelope(subject, window) { order.push("read"); return { channel: "in_app", deliveryId: NOTICE, subject, window }; },
       async dispatch() { order.push("acknowledge"); return { status: "ok", rows: 1 }; },
     });
-    assert.deepEqual(await runNotificationDispatch(`client:${CLIENT}`, `notification:${NOTICE}`, repository, async () => { throw new Error("email must stay untouched"); }), { status: "ok", rows: 1 });
+    assert.deepEqual(await runNotificationDispatch(`client:${CLIENT}`, `notification:${NOTICE}`, repository, async () => { throw new Error("email must stay untouched"); }, async () => ({ status: "skipped", reason: "feature_off" })), { status: "ok", rows: 1 });
     assert.deepEqual(order, ["read", "acknowledge"]);
+  });
+  it("offers the delivered notification to consumer email before acknowledging it", async () => {
+    const order: string[] = [];
+    const seen: unknown[] = [];
+    const repository = repo({
+      async readDispatchEnvelope(subject, window) { order.push("read"); return { channel: "in_app", deliveryId: NOTICE, subject, window }; },
+      async dispatch() { order.push("acknowledge"); return { status: "ok", rows: 1 }; },
+    });
+    const result = await runNotificationDispatch(
+      `client:${CLIENT}`,
+      `notification:${NOTICE}`,
+      repository,
+      async () => { throw new Error("operator email must stay untouched"); },
+      async (input) => { order.push("consumer email"); seen.push(input); return { status: "skipped", reason: "preference_off" }; },
+    );
+    assert.deepEqual(result, { status: "ok", rows: 1 });
+    assert.deepEqual(order, ["read", "consumer email", "acknowledge"]);
+    assert.deepEqual(seen, [{ deliveryId: NOTICE, notificationId: NOTICE }]);
+  });
+  it("leaves the delivery queued when consumer email fails, so the job retries both halves", async () => {
+    const order: string[] = [];
+    const repository = repo({
+      async readDispatchEnvelope(subject, window) { order.push("read"); return { channel: "in_app", deliveryId: NOTICE, subject, window }; },
+      async dispatch() { order.push("acknowledge"); return { status: "ok", rows: 1 }; },
+    });
+    assert.deepEqual(
+      await runNotificationDispatch(
+        `client:${CLIENT}`,
+        `notification:${NOTICE}`,
+        repository,
+        async () => { throw new Error("operator email must stay untouched"); },
+        async () => ({ status: "failed", reason: "send" }),
+      ),
+      { status: "failed" },
+    );
+    assert.deepEqual(order, ["read"]);
   });
   it("sends an email before acknowledgement and never acknowledges a rejected send", async () => {
     const subject = `org:${CLIENT}`, window = `billing-event:${EVENT}`;

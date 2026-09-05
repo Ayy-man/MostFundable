@@ -77,6 +77,26 @@ export type ConsumerNotificationEmailResult =
     readonly reason: "preferences_read" | "recipient_read" | "send";
   };
 
+/**
+ * The three conditions that make consumer email a no-op regardless of the event: the kill switch,
+ * the feature flag, and a driver that cannot actually reach a provider. Exported through
+ * `consumerNotificationEmailEnabled` so a caller can check them before spending a database read.
+ */
+function configurationGate(env: EnvSource): ConsumerNotificationEmailSkipReason | null {
+  if (!CONSUMER_NOTIFICATION_EMAIL_AVAILABLE) return "email_unavailable";
+  if (!featureFlag("FEATURE_EMAIL", env)) return "feature_off";
+  try {
+    return resolveDriver("email", env) === "mock" ? "driver_unset" : null;
+  } catch {
+    // A selector set to a value the table rejects, or a resend arm missing its credentials.
+    return "driver_unset";
+  }
+}
+
+export function consumerNotificationEmailEnabled(env: EnvSource = process.env): boolean {
+  return configurationGate(env) === null;
+}
+
 function skipped(
   reason: ConsumerNotificationEmailSkipReason,
 ): ConsumerNotificationEmailResult {
@@ -123,18 +143,8 @@ export async function dispatchConsumerNotificationEmail(
   input: ConsumerNotificationEmailInput,
   dependencies: ConsumerNotificationEmailDependencies,
 ): Promise<ConsumerNotificationEmailResult> {
-  if (!CONSUMER_NOTIFICATION_EMAIL_AVAILABLE) return skipped("email_unavailable");
-
-  const env = dependencies.env ?? process.env;
-  if (!featureFlag("FEATURE_EMAIL", env)) return skipped("feature_off");
-
-  let driverName: "mock" | "resend";
-  try {
-    driverName = resolveDriver("email", env);
-  } catch {
-    return skipped("driver_unset");
-  }
-  if (driverName === "mock") return skipped("driver_unset");
+  const gate = configurationGate(dependencies.env ?? process.env);
+  if (gate !== null) return skipped(gate);
 
   if (
     !isConsumerNotificationEventType(input.eventType)
