@@ -7,6 +7,8 @@
  * `analysis_runs.derived` cannot reach a browser by default (see `map.ts`).
  */
 
+import type { NarrativeV1 } from "../llm/narrative/contract.ts";
+
 /** What the consumer is told about one readiness factor. */
 export type FactorStateV1 =
   /** The latest evidence satisfies this factor. */
@@ -114,6 +116,16 @@ export type ReportingV1 =
 
 export interface ConsumerOptimizationV1 {
   readonly schemaVersion: 1;
+  /**
+   * The plan written in words for this consumer's latest analysis, or null when there is none.
+   *
+   * Additive and optional-by-null, so `schemaVersion` stays 1: a client that predates the field
+   * reads the same view it always did, and a deployment whose database has no `plans.narrative`
+   * column (or whose generation failed its grounding check) answers null rather than an error. The
+   * stored jsonb is validated against `NarrativeV1` before it reaches this field; anything
+   * malformed becomes null, because a partial narrative is prose nobody wrote.
+   */
+  readonly narrative: NarrativeV1 | null;
   readonly clientId: string;
   readonly readiness: number | null;
   readonly readinessLabel: string | null;

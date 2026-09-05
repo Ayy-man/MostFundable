@@ -5,6 +5,7 @@ import {
 } from "../llm/checklist-seeds.ts";
 import { readinessLabelFor } from "../llm/evaluator.ts";
 import { accountStates } from "../llm/mock-driver.ts";
+import { parseNarrativeV1 } from "./narrative-guard.ts";
 
 import type { AccountFeature, DerivedFeatures } from "../analysis/features.ts";
 import type { ChecklistStateV1, FundingReadinessPlanV1 } from "../llm/types.ts";
@@ -154,8 +155,19 @@ export interface ConsumerChecklistStateRow {
 
 export interface ConsumerOptimizationSourceV1 {
   readonly clientId: string;
-  /** The latest `plans` row, or null when the client has none. `body` is unvalidated jsonb. */
-  readonly plan: { readonly body: unknown; readonly readinessScore: number } | null;
+  /**
+   * The latest `plans` row, or null when the client has none. `body` is unvalidated jsonb.
+   *
+   * `narrative` is the same row's `plans.narrative`, also unvalidated. It is OPTIONAL rather than
+   * nullable because a database that predates migration 435 has no such column, so the read cannot
+   * select it and hands back a row with the property absent; the guard treats absent and null
+   * alike.
+   */
+  readonly plan: {
+    readonly body: unknown;
+    readonly readinessScore: number;
+    readonly narrative?: unknown;
+  } | null;
   /** The latest `analysis_runs` row, or null when nothing has been analyzed. */
   readonly run: {
     readonly ranAt: string;
@@ -400,6 +412,9 @@ export function buildConsumerOptimization(
           },
     clientId: input.clientId,
     estimatedCompletion: { days: null, label: "TBD" },
+    // Validated here rather than at the query, so every path into this projection — the real read,
+    // a fixture, a test gateway — passes through the one guard.
+    narrative: parseNarrativeV1(input.plan?.narrative),
     provenance,
     readiness,
     readinessLabel:
