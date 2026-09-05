@@ -55,7 +55,7 @@ describe("admin surface contract", () => {
   });
 
   it("formats every governed database instant instead of rendering raw ISO values", () => {
-    const formatter = region("function formatInstant", "type IntelItem");
+    const formatter = region("function formatInstant", "type BankComment");
     assert.match(formatter, /typeof value !== "string"/);
     assert.match(formatter, /Number\.isFinite\(instant\.getTime\(\)\)/);
     assert.match(formatter, /timeZone: "UTC"/);

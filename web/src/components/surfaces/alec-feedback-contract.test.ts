@@ -214,7 +214,7 @@ describe("Alec feedback · operator contract", () => {
     assert.match(inbox, /Client inbox/);
     assert.match(inbox, /Internal notes/);
     assert.match(inbox, /message\.visibility === "internal"/);
-    assert.match(operator, /timelineEnabled=\{false\}/);
+    assert.match(operator, /timelineEnabled=\{timelineEnabled\}/);
     assert.match(operator, /<TrackerClientTimeline/);
   });
 

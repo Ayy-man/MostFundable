@@ -110,7 +110,11 @@ describe("admin surface: every panel names a source or says it has none", () => 
   });
 
   it("holds no seeded audit row, staged finding, held reply or eval run", () => {
-    assert.match(CODE, /const INTEL_ITEMS: IntelItem\[\] = \[\];/);
+    // The staged-intel queue is gone entirely, along with the panel that
+    // reviewed it: an empty list still put a "0 pending" queue and a promote
+    // control in front of an administrator for a pipeline nothing feeds.
+    assert.equal(CODE.includes("INTEL_ITEMS"), false);
+    assert.equal(CODE.includes("type IntelItem"), false);
     assert.match(CODE, /const HELD_REPLIES: readonly HeldReply\[\] = \[\];/);
     assert.match(CODE, /useState<AuditEvent\[\]>\(\[\]\)/);
     assert.match(CODE, /useState<BankComment\[\]>\(\[\]\)/);
@@ -118,6 +122,24 @@ describe("admin surface: every panel names a source or says it has none", () => 
     // described them, so there is nothing left to seed them from.
     assert.equal(CODE.includes("type EvalRun ="), false);
     assert.equal(CODE.includes("Runs this month"), false);
+  });
+
+  /**
+   * The health board reports what this deployment can observe, or says it
+   * cannot. Eleven elements under a permanent "Not monitored" pill was a panel
+   * that could not tell a healthy platform from a broken one, and a fixture
+   * list of element names is not a health check however it is styled.
+   */
+  it("reads System health from the admin health route rather than a fixture list", () => {
+    assert.ok(CODE.includes('useAdminResource("/api/admin/health", parseAdminHealth)'));
+    assert.equal(CODE.includes("HEALTH_ELEMENTS"), false);
+    assert.equal(CODE.includes("Not monitored"), false);
+    // Every unreadable state is named rather than rendered as a green board.
+    for (const reason of [
+      "Checking the platform's health",
+      "The health checks could not be read",
+      "Platform health checks are not enabled on this deployment",
+    ]) assert.ok(CODE.includes(reason), `unnamed health read state: ${reason}`);
   });
 
   it("takes the platform support queue from the support API", () => {

@@ -49,16 +49,27 @@ describe("Drop 7 admin IA", () => {
     assert.ok(source.includes('activeView !== "ai-chat"'));
   });
 
-  it("nests Industry updates under Bank Vault without duplicating its stateful body", () => {
+  /**
+   * Bank Vault is one body again, because Industry updates never had a read.
+   *
+   * The tab held a staged-findings queue over an empty list and a bank-trends
+   * view derived from it — a promote/reject workflow, a "pending" count and a
+   * publication path for findings nothing ingests. Leaving it in navigation
+   * told an administrator a lender-news pipeline exists. The Banks body, which
+   * does read the catalog, is untouched.
+   */
+  it("shows Bank Vault as a single Banks body with no Industry updates tab", () => {
     const parent = source.slice(source.indexOf("function LendersView"), source.indexOf("function LendersBody"));
-    assert.ok(parent.includes('{ label: "Banks", value: "banks" }'));
-    assert.ok(parent.includes('{ label: "Industry updates", value: "industry-updates" }'));
     assert.ok(parent.includes("<LendersBody "));
-    assert.ok(parent.includes("<IndustryUpdatesBody "));
-    assert.equal((source.match(/function IndustryUpdatesBody/g) ?? []).length, 1);
-    const body = source.slice(source.indexOf("function IndustryUpdatesBody"), source.indexOf("function TrainingsView"));
-    assert.equal(body.includes("<PageHeader"), false);
-    for (const action of ["Promote selected", "Reject selected", "Save to review", "BankTrendsSection"]) assert.ok(body.includes(action));
+    assert.equal(parent.includes("<PillTabs"), false);
+    for (const gone of [
+      "Industry updates",
+      "industry-updates",
+      "IndustryUpdatesBody",
+      "BankTrendsSection",
+      "Staged findings",
+      "intelDecisions",
+    ]) assert.equal(source.includes(gone), false, `Industry updates leftover: ${gone}`);
   });
 
   it("nests fixture or governed Analytics under the three SaaS tabs", () => {

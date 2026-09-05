@@ -9,7 +9,7 @@ const client = readFileSync(new URL("../../lib/admin/bank-catalog-client.ts", im
 describe("admin Bank Vault catalog management", () => {
   it("is mounted on the existing Bank Vault surface without displacing privacy controls", () => {
     assert.match(surface, /import \{ AdminBankCatalogManagement \}/);
-    const lenders = surface.slice(surface.indexOf("function LendersBody"), surface.indexOf("function BankTrendsSection"));
+    const lenders = surface.slice(surface.indexOf("function LendersBody"), surface.indexOf("type TrainingEditor"));
     assert.match(lenders, /<AdminBankCatalogManagement enabled=\{vaultEnabled\} onMutation=\{recordAudit\} \/>/);
     assert.match(surface, /import \{ AdminPrivacyRequests \}/);
     assert.match(surface, /<AdminPrivacyRequests \/>/);

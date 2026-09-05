@@ -88,11 +88,23 @@ test("states the shown and total conversation counts separately", () => {
 test("moves system updates to the selected client's Activity view", () => {
   const surface = withoutComments(readFileSync(SURFACE, "utf8"));
   const activity = withoutComments(readFileSync(CLIENT_TIMELINE, "utf8"));
-  assert.match(surface, /timelineEnabled=\{false\}/);
   assert.match(surface, /<TrackerClientTimeline/);
   assert.match(activity, /readSupportInbox\(\)/);
   assert.match(activity, /readSupportThread\(thread\.id\)/);
   assert.match(activity, /event\.kind !== "stage_changed"/);
+});
+
+/**
+ * The surface owns `FEATURE_TIMELINE` as a prop, and the Inbox is the pane that renders behind it.
+ *
+ * A hard-coded `timelineEnabled={false}` at the mount reads as wired while the flag does nothing:
+ * the timeline bands, the filter chips and the Request a document control stay dark however the
+ * flag is set. The mount has to hand the surface's own prop down.
+ */
+test("hands the surface's FEATURE_TIMELINE prop down to the Inbox", () => {
+  const surface = withoutComments(readFileSync(SURFACE, "utf8"));
+  assert.match(surface, /<OperatorInbox[\s\S]*?timelineEnabled=\{timelineEnabled\}[\s\S]*?\/>/);
+  assert.doesNotMatch(surface, /timelineEnabled=\{false\}/);
 });
 
 /**

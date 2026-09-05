@@ -14,7 +14,6 @@ import {
 import {
   BookOpen,
   Building2,
-  Check,
   FileText,
   FlaskConical,
   Landmark,
@@ -25,7 +24,6 @@ import {
   Plus,
   RefreshCw,
   Search,
-  X,
 } from "lucide-react";
 
 import {
@@ -71,7 +69,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { HEALTH_ELEMENTS } from "@/lib/demo/co-fixtures";
 import { readSupportInbox } from "@/lib/operator/support-inbox.client";
 import type { SupportInboxThread } from "@/lib/operator/support-inbox.client";
 import {
@@ -142,12 +139,13 @@ import {
   adminReadReason,
   isAdminReady,
   parseAdminFundedSeries,
+  parseAdminHealth,
   parseAdminReviewQueue,
   parseAdminSaasMetrics,
   parseAdminTenants,
   useAdminResource,
 } from "@/lib/admin/platform-client";
-import type { AdminRead, AdminTenantView } from "@/lib/admin/platform-client";
+import type { AdminHealthStatusView, AdminRead, AdminTenantView } from "@/lib/admin/platform-client";
 import {
   AdminWorkspaceClientError,
   changeAdminWorkspaceLifecycle,
@@ -239,17 +237,6 @@ function formatInstant(value: unknown): string {
   }).format(instant)} UTC`;
 }
 
-type IntelItem = {
-  bank: string;
-  confidence: number;
-  id: string;
-  sources: number;
-  source: string;
-  tier: "confirmed" | "probable" | "speculating";
-  title: string;
-  type: "data point" | "policy change" | "pattern" | "gotcha";
-};
-
 type BankComment = {
   author: string;
   bankName: string;
@@ -284,20 +271,6 @@ type PlatformConfig = {
   sandbox: boolean;
   trialCoach: boolean;
 };
-
-/**
- * The staged-intel queue is empty because no intel pipeline exists.
- *
- * It used to carry eight findings written as sourced fact — "Bluevine approved
- * $45k · 720 FICO · FL", "Slack intel · Jul 20" — with confidence percentages
- * and source counts, presented to a signed-in platform administrator as work
- * waiting on their decision. Nothing ingests Slack, no call is transcribed, and
- * promoting a finding writes to no table, so every row was an invented claim
- * about a lender's underwriting. There is no read to point the list at, and an
- * honest empty queue is the answer an absent pipeline has: the panel's own
- * empty state already says new findings appear here before publication.
- */
-const INTEL_ITEMS: IntelItem[] = [];
 
 function nextBankCommentId(current: BankComment[]) {
   const max = current.reduce((highest, comment) => {
@@ -401,7 +374,6 @@ type AdminSessionContextValue = {
   evaluatorThreshold: number;
   extraCases: Record<string, number>;
   forcePullPrice: string;
-  intelDecisions: Record<string, "promoted" | "rejected">;
   knowledgePages: KnowledgePage[];
   promptDrafts: Record<string, string>;
   // The actor is stamped by the recorder from the session, never passed in: a
@@ -415,7 +387,6 @@ type AdminSessionContextValue = {
   setEvaluatorThreshold: Dispatch<SetStateAction<number>>;
   setExtraCases: Dispatch<SetStateAction<Record<string, number>>>;
   setForcePullPrice: Dispatch<SetStateAction<string>>;
-  setIntelDecisions: Dispatch<SetStateAction<Record<string, "promoted" | "rejected">>>;
   setKnowledgePages: Dispatch<SetStateAction<KnowledgePage[]>>;
   setPromptDrafts: Dispatch<SetStateAction<Record<string, string>>>;
 };
@@ -1128,7 +1099,6 @@ const EMPTY_BANK_STATS: Record<OutcomePeriod, BankHistoricalStat[]> = Object.fro
 ) as Record<OutcomePeriod, BankHistoricalStat[]>;
 
 function LendersView({ vaultEnabled = false }: { vaultEnabled?: boolean }) {
-  const [bankVaultTab, setBankVaultTab] = useState<"banks" | "industry-updates">("banks");
   // FEATURE_VAULT (Phase 8), the same swap the operator Bank Vault made — the
   // admin caller is the one that never adopted it, so both of its bank tables
   // and every trend panel underneath them were computed from seven illustrative
@@ -1157,16 +1127,7 @@ function LendersView({ vaultEnabled = false }: { vaultEnabled?: boolean }) {
   return (
     <>
       <PageHeader title="Bank Vault" />
-      <PillTabs
-        onChange={setBankVaultTab}
-        tabs={[
-          { label: "Banks", value: "banks" },
-          { label: "Industry updates", value: "industry-updates" },
-        ]}
-        value={bankVaultTab}
-      />
-      <div hidden={bankVaultTab !== "banks"}><LendersBody bankStatsByPeriod={bankStatsByPeriod} unreadableReason={unreadableReason} vaultEnabled={vaultEnabled} /></div>
-      <div hidden={bankVaultTab !== "industry-updates"}><IndustryUpdatesBody bankStatsByPeriod={bankStatsByPeriod} unreadableReason={unreadableReason} /></div>
+      <LendersBody bankStatsByPeriod={bankStatsByPeriod} unreadableReason={unreadableReason} vaultEnabled={vaultEnabled} />
     </>
   );
 }
@@ -1423,259 +1384,6 @@ function LendersBody({
         fixtureDetailAllowed={false}
         onClose={() => setDetailBankId(null)}
       />
-    </>
-  );
-}
-
-function BankTrendsSection({
-  bankStatsByPeriod,
-  unreadableReason,
-}: {
-  bankStatsByPeriod: Record<OutcomePeriod, BankHistoricalStat[]>;
-  unreadableReason: string | null;
-}) {
-  const recent = bankStatsByPeriod["30d"];
-  const yearly = bankStatsByPeriod["12mo"];
-  const rows = yearly
-    .map((year) => {
-      const month = recent.find((bank) => bank.bankId === year.bankId);
-      const monthlyAverageOutcomes = year.outcomes / 12;
-      const recentOutcomes = month?.outcomes ?? 0;
-      const volumeTrend: "up" | "down" | "flat" =
-        recentOutcomes > monthlyAverageOutcomes * 1.15
-          ? "up"
-          : recentOutcomes < monthlyAverageOutcomes * 0.85
-            ? "down"
-            : "flat";
-      const approvalDelta =
-        month && month.outcomes && year.outcomes
-          ? month.approvalRate - year.approvalRate
-          : null;
-      return {
-        approvalDelta,
-        bankName: year.bankName,
-        monthApproval: month?.outcomes ? month.approvalRate : null,
-        recentOutcomes,
-        volumeTrend,
-        yearApproval: year.outcomes ? year.approvalRate : null,
-      };
-    })
-    .sort((left, right) => right.recentOutcomes - left.recentOutcomes);
-  const totalRecent = rows.reduce((total, row) => total + row.recentOutcomes, 0);
-  const risers = rows.filter((row) => (row.approvalDelta ?? 0) > 2);
-  const fallers = rows.filter((row) => (row.approvalDelta ?? 0) < -2);
-
-  return (
-    <div className="space-y-5">
-      <Panel
-        title="This period in the vault"
-        description="Recorded outcomes over the last 30 days compared with the trailing 12-month pace · history, not offers or predictions"
-      >
-        {unreadableReason ? <p className="text-sm leading-6 text-muted-foreground">{unreadableReason}</p> : <p className="text-sm leading-6 text-muted-foreground">
-          Operators recorded {formatDemoNumber(totalRecent)} bank outcomes in
-          the last 30 days.{" "}
-          {risers.length
-            ? `${risers.map((row) => row.bankName).join(" and ")} ${risers.length === 1 ? "is" : "are"} approving at a higher rate than the trailing year. `
-            : "No bank is approving meaningfully above its trailing-year rate. "}
-          {fallers.length
-            ? `${fallers.map((row) => row.bankName).join(" and ")} ${fallers.length === 1 ? "is" : "are"} running below the trailing-year approval rate.`
-            : "No bank is running meaningfully below its trailing-year approval rate."}
-        </p>}
-      </Panel>
-      <div className="grid gap-5 lg:grid-cols-2 2xl:grid-cols-3">
-        {rows.map((row) => (
-          <Panel
-            key={row.bankName}
-            title={row.bankName}
-            trailing={
-              <StatusPill tone={row.volumeTrend === "up" ? "success" : row.volumeTrend === "down" ? "warning" : "neutral"}>
-                {row.volumeTrend === "up" ? "Funding more" : row.volumeTrend === "down" ? "Funding less" : "Steady"}
-              </StatusPill>
-            }
-          >
-            <dl className="grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <dt className="text-xs text-muted-foreground">Outcomes · 30 days</dt>
-                <dd className="mt-1 font-semibold tabular-nums">{formatDemoNumber(row.recentOutcomes)}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">Approval · 30 days</dt>
-                <dd className="mt-1 font-semibold tabular-nums">{row.monthApproval === null ? "None" : formatDemoPercent(row.monthApproval)}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">Approval · 12 months</dt>
-                <dd className="mt-1 font-medium tabular-nums">{row.yearApproval === null ? "None" : formatDemoPercent(row.yearApproval)}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">Direction</dt>
-                <dd className="mt-1 font-medium">
-                  {row.approvalDelta === null
-                    ? "Not enough recent outcomes"
-                    : row.approvalDelta > 2
-                      ? "Approvals trending up"
-                      : row.approvalDelta < -2
-                        ? "Approvals trending down"
-                        : "Approvals steady"}
-                </dd>
-              </div>
-            </dl>
-          </Panel>
-        ))}
-      </div>
-      <p className="font-mono text-[0.62rem] uppercase leading-5 tracking-[0.08em] text-muted-foreground">
-        Derived from recorded historical outcomes · not offers, predictions, or approval odds
-      </p>
-    </div>
-  );
-}
-
-function IndustryUpdatesBody({
-  bankStatsByPeriod,
-  unreadableReason,
-}: {
-  bankStatsByPeriod: Record<OutcomePeriod, BankHistoricalStat[]>;
-  unreadableReason: string | null;
-}) {
-  const { actorName, bankComments, intelDecisions, recordAudit, setBankComments, setIntelDecisions } = useAdminSession();
-  const [intelMode, setIntelMode] = useState<"trends" | "findings">("trends");
-  const [bank, setBank] = useState("All banks");
-  const [tier, setTier] = useState("All tiers");
-  const [selected, setSelected] = useState<string[]>([]);
-  const [confirmBulk, setConfirmBulk] = useState(false);
-  const [commentFor, setCommentFor] = useState<string | null>(null);
-  const [drafts, setDrafts] = useState<Record<string, string>>({});
-  const [note, setNote] = useState("");
-  const banks = ["All banks", ...Array.from(new Set(INTEL_ITEMS.map((item) => item.bank)))];
-  const visibleItems = INTEL_ITEMS.filter((item) => !intelDecisions[item.id] && (bank === "All banks" || item.bank === bank) && (tier === "All tiers" || item.tier === tier));
-
-  function toggleSelected(id: string) {
-    setSelected((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
-  }
-
-  function decide(ids: string[], decision: "promoted" | "rejected") {
-    setIntelDecisions((current) => ({ ...current, ...Object.fromEntries(ids.map((id) => [id, decision])) }));
-    ids.forEach((id) => {
-      const item = INTEL_ITEMS.find((candidate) => candidate.id === id);
-      recordAudit({ action: `${decision === "promoted" ? "Promoted" : "Rejected"} staged finding ${id}`, target: `intel.${item?.bank.toLowerCase().replace(/[^a-z0-9]+/g, "_") ?? id}`, risk: "Review" });
-    });
-    setSelected([]);
-    setConfirmBulk(false);
-    setNote(`${ids.length} ${ids.length === 1 ? "finding" : "findings"} ${decision}. The audit trail records source and reviewer.`);
-  }
-
-  function commentsFor(bankName: string) {
-    return bankComments.filter((entry) => entry.bankName === bankName);
-  }
-
-  function addComment(item: IntelItem) {
-    const body = (drafts[item.id] ?? "").trim();
-    if (!body) return;
-    setBankComments((current) => [
-      { author: actorName, bankName: item.bank, body, createdAt: "Today", id: nextBankCommentId(current), status: "In review" },
-      ...current,
-    ]);
-    setDrafts((current) => ({ ...current, [item.id]: "" }));
-    recordAudit({ action: `Added review comment on ${item.bank}`, target: `bank_review.${item.bank.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`, risk: "Review" });
-    setNote(`Comment noted for ${item.bank} in this session. Published lender records and AI context are unchanged.`);
-  }
-
-  return (
-    <>
-      <div className="mb-4 flex justify-end">
-        <StatusPill tone="warning">{INTEL_ITEMS.length - Object.keys(intelDecisions).length} pending</StatusPill>
-      </div>
-      <PillTabs
-        onChange={setIntelMode}
-        tabs={[
-          { label: "Bank trends", value: "trends" },
-          { label: `Staged findings · ${INTEL_ITEMS.length - Object.keys(intelDecisions).length}`, value: "findings" },
-        ]}
-        value={intelMode}
-      />
-      {intelMode === "trends" ? <BankTrendsSection bankStatsByPeriod={bankStatsByPeriod} unreadableReason={unreadableReason} /> : (
-      <>
-      {/*
-        The three ingestion tiles are gone. They reported "Slack ingestion ·
-        Synced 4 min ago · #lender-intel" and "Last call processed · Today 1:42
-        PM · Bluevine underwriting debrief" — a live pipeline with a recent
-        timestamp, on a platform that ingests no Slack channel and transcribes
-        no call. Only the third tile was true, and a review gate over an empty
-        queue is what the queue below already shows.
-      */}
-      {note ? <div className="mb-4"><Notice tone="success">{note}</Notice></div> : null}
-      <ViewToolbar><AdminSelect ariaLabel="Intel bank" onChange={setBank} options={banks} value={bank} /><AdminSelect ariaLabel="Intel confidence tier" onChange={setTier} options={["All tiers", "confirmed", "probable", "speculating"]} value={tier} /><Button onClick={() => setSelected(visibleItems.filter((item) => item.sources >= 2).map((item) => item.id))} size="sm" variant="link">Select confirmed with 2+ sources</Button><span className="text-xs text-muted-foreground sm:ml-auto"><span className="tabular-nums">{visibleItems.length}</span> findings</span></ViewToolbar>
-
-      {selected.length > 0 ? (
-        <div className="mb-4 rounded-lg border border-primary/20 bg-primary/8 p-3">
-          {!confirmBulk ? (
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center"><p className="text-sm font-semibold"><span className="tabular-nums">{selected.length}</span> selected</p><div className="flex flex-wrap gap-2 sm:ml-auto"><Button onClick={() => setConfirmBulk(true)} size="sm">Promote selected</Button><Button onClick={() => decide(selected, "rejected")} size="sm" variant="destructive">Reject selected</Button><Button onClick={() => setSelected([])} size="sm" variant="ghost">Clear</Button></div></div>
-          ) : (
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center"><p className="text-sm"><span className="font-semibold">Confirm promotion.</span> Promotion is recorded against this browser session only; no canonical lender record is written from this page.</p><div className="flex gap-2 sm:ml-auto"><Button onClick={() => decide(selected, "promoted")} size="sm"><Check aria-hidden />Confirm</Button><Button onClick={() => setConfirmBulk(false)} size="sm" variant="outline">Cancel</Button></div></div>
-          )}
-        </div>
-      ) : null}
-
-      <Panel title="Staged findings" description="Confidence is evidence strength, not a lending prediction">
-        {visibleItems.length ? (
-          <>
-            <div className="hidden md:block">
-              <Table className="min-w-[1120px]">
-                <TableHeader><TableRow><TableHead className="w-10"><span className="sr-only">Select</span></TableHead><TableHead>Finding</TableHead><TableHead>Type</TableHead><TableHead>Bank</TableHead><TableHead>Source</TableHead><TableHead>Confidence</TableHead><TableHead>Sources</TableHead><TableHead>Tier</TableHead><TableHead className="text-right">Decision</TableHead></TableRow></TableHeader>
-                <TableBody>{visibleItems.map((item) => (
-                  <Fragment key={item.id}>
-                    <TableRow>
-                      <TableCell><input aria-label={`Select ${item.title}`} checked={selected.includes(item.id)} className="size-4 rounded border-input accent-primary focus-visible:ring-2 focus-visible:ring-ring" onChange={() => toggleSelected(item.id)} type="checkbox" /></TableCell>
-                      <TableCell className="max-w-sm whitespace-normal"><p className="font-semibold leading-5">{item.title}</p>{item.bank === "Truist" ? <p className="mt-1 text-xs text-[var(--consumer-warning-ink)]">Conflicts with published policy</p> : null}</TableCell>
-                      <TableCell><StatusPill tone="neutral">{titleCase(item.type)}</StatusPill></TableCell><TableCell>{item.bank}</TableCell><TableCell className="text-xs text-muted-foreground">{item.source}</TableCell><TableCell><ProgressMeter label={`${item.title} confidence`} value={item.confidence} /></TableCell><TableCell className="tabular-nums">{item.sources}</TableCell>
-                      <TableCell><StatusPill tone={item.tier === "confirmed" ? "success" : item.tier === "probable" ? "info" : "warning"}>{titleCase(item.tier)}</StatusPill></TableCell>
-                      <TableCell><div className="flex justify-end gap-1"><Button aria-label={`Promote ${item.title}`} onClick={() => decide([item.id], "promoted")} size="xs">Promote</Button><Button aria-label={`Edit ${item.title}`} onClick={() => setNote(`Editing ${item.bank}. Changes remain staged until promotion.`)} size="xs" variant="outline">Edit</Button><Button aria-expanded={commentFor === item.id} aria-label={`Comment on ${item.title}`} onClick={() => setCommentFor((current) => (current === item.id ? null : item.id))} size="xs" variant="outline">Comment{commentsFor(item.bank).length ? ` (${commentsFor(item.bank).length})` : ""}</Button><Button aria-label={`Reject ${item.title}`} onClick={() => decide([item.id], "rejected")} size="icon-xs" variant="ghost"><X aria-hidden /></Button></div></TableCell>
-                    </TableRow>
-                    {commentFor === item.id ? (
-                      <TableRow>
-                        <TableCell className="bg-muted/30" colSpan={9}>
-                          <div className="space-y-3 py-1">
-                            {commentsFor(item.bank).length ? (
-                              <div className="space-y-2">
-                                {commentsFor(item.bank).map((entry) => (
-                                  <div className="rounded-lg border border-border bg-card p-3" key={entry.id}>
-                                    <div className="flex items-center justify-between gap-2">
-                                      <span className="text-xs font-semibold">{entry.author} · {entry.createdAt}</span>
-                                      <StatusPill tone="warning">{entry.status}</StatusPill>
-                                    </div>
-                                    <p className="mt-2 text-xs leading-5 text-muted-foreground">{entry.body}</p>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : <p className="text-xs text-muted-foreground">No comments on {item.bank} yet.</p>}
-                            <Textarea aria-label={`Comment on ${item.bank}`} onChange={(event) => setDrafts((current) => ({ ...current, [item.id]: event.target.value }))} placeholder="Add sourced context for review" value={drafts[item.id] ?? ""} />
-                            <Button disabled={!(drafts[item.id] ?? "").trim()} onClick={() => addComment(item)} size="sm">Save to review</Button>
-                            <p className="text-xs leading-5 text-muted-foreground">This comment stays in this browser session. No reviewer, lender record, AI context, or external system receives it, because no staged-intel review queue exists yet.</p>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ) : null}
-                  </Fragment>
-                ))}</TableBody>
-              </Table>
-            </div>
-            <div className="divide-y divide-border md:hidden">
-              {visibleItems.map((item) => (
-                <MobileRecord
-                  action={<><label className="flex min-h-11 items-center gap-2 pr-2 text-sm font-medium"><input aria-label={`Select ${item.title}`} checked={selected.includes(item.id)} className="size-4 rounded border-input accent-primary" onChange={() => toggleSelected(item.id)} type="checkbox" />Select</label><Button aria-label={`Promote ${item.title}`} className="min-h-11" onClick={() => decide([item.id], "promoted")}>Promote</Button><Button aria-label={`Reject ${item.title}`} className="min-h-11" onClick={() => decide([item.id], "rejected")} variant="outline">Reject</Button></>}
-                  fields={[{ label: "Bank", value: item.bank }, { label: "Confidence", value: `${item.confidence}%` }, { label: "Sources", value: item.sources }, { label: "Type", value: item.type }, { label: "Comments in review", value: String(commentsFor(item.bank).length) }, { label: "Source", value: item.source, wide: true }]}
-                  key={item.id}
-                  status={<StatusPill tone={item.tier === "confirmed" ? "success" : item.tier === "probable" ? "info" : "warning"}>{titleCase(item.tier)}</StatusPill>}
-                  subtitle={item.bank === "Truist" ? "Conflicts with published policy" : undefined}
-                  title={item.title}
-                />
-              ))}
-            </div>
-          </>
-        ) : <EmptyState title="Queue clear" description="No staged findings match these filters. New Slack and call findings will appear here before publication." />}
-        <p className="mt-4 border-t border-border pt-4 font-mono text-[0.62rem] uppercase leading-5 tracking-[0.08em] text-muted-foreground">Staged intel and review comments → human review → canonical lender records</p>
-      </Panel>
-      </>
-      )}
     </>
   );
 }
@@ -2721,7 +2429,29 @@ function HeldRepliesSection() {
  * path an operator actually has. It carries no per-element association and no
  * severity, so neither is shown.
  */
-const HEALTH_NOT_MONITORED = "These platform elements have no automated health check. The platform support queue below is the recorded source.";
+/**
+ * What the health panel says about itself.
+ *
+ * It used to list eleven platform elements, every one of them under a "Not
+ * monitored" pill — a health board that reported nothing about the platform's
+ * health and could not tell a healthy deployment from a broken one. The three
+ * checks that replace it are the ones `/api/admin/health` can answer from this
+ * deployment: the admin database, the background job queue, and which services
+ * are still on a mock driver.
+ */
+const HEALTH_DESCRIPTION = "Three live checks read from this deployment: the admin database, the background job queue, and driver selection. The platform support queue below is the recorded ticket source.";
+
+const HEALTH_TONES: Record<AdminHealthStatusView, "success" | "warning" | "neutral"> = {
+  degraded: "warning",
+  ok: "success",
+  unknown: "neutral",
+};
+
+const HEALTH_PILLS: Record<AdminHealthStatusView, string> = {
+  degraded: "Degraded",
+  ok: "OK",
+  unknown: "Unknown",
+};
 
 type AdminSupportRead =
   | { state: "loading" }
@@ -2741,7 +2471,15 @@ function SupportTicketsSection() {
     });
     return () => { active = false; };
   }, []);
-  const healthCategories = Array.from(new Set(HEALTH_ELEMENTS.map((element) => element.category)));
+  const { read: healthRead } = useAdminResource("/api/admin/health", parseAdminHealth);
+  const healthTiles = isAdminReady(healthRead) ? healthRead.tiles : [];
+  const healthReason = healthTiles.length > 0
+    ? null
+    : healthRead === "loading"
+      ? "Checking the platform's health"
+      : healthRead === "failed"
+        ? "The health checks could not be read"
+        : "Platform health checks are not enabled on this deployment";
   const threads = read.state === "ready" ? read.threads : [];
   const openThreadCount = threads.filter((thread) => thread.status !== "resolved").length;
   const queueReason = read.state === "loading"
@@ -2755,24 +2493,22 @@ function SupportTicketsSection() {
   return (
     <Panel
       title="System health"
-      description={HEALTH_NOT_MONITORED}
+      description={HEALTH_DESCRIPTION}
       trailing={read.state === "ready" ? <StatusPill tone={openThreadCount ? "warning" : "success"}>{openThreadCount} open</StatusPill> : null}
     >
-      <div className="grid gap-6 lg:grid-cols-2">
-        {healthCategories.map((category) => (
-          <section key={category}>
-            <h3 className="mb-2 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{category}</h3>
-            <div className="divide-y divide-border">
-              {HEALTH_ELEMENTS.filter((element) => element.category === category).map((element) => (
-                <div className="flex w-full items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0" key={element.id}>
-                  <span className="text-sm font-medium">{element.label}</span>
-                  <StatusPill tone="neutral">Not monitored</StatusPill>
-                </div>
-              ))}
+      {healthReason ? <p className="text-sm leading-6 text-muted-foreground">{healthReason}</p> : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {healthTiles.map((tile) => (
+            <div className="rounded-lg border border-border p-3" key={tile.id}>
+              <div className="flex items-start justify-between gap-3">
+                <span className="text-sm font-medium">{tile.label}</span>
+                <StatusPill tone={HEALTH_TONES[tile.status]}>{HEALTH_PILLS[tile.status]}</StatusPill>
+              </div>
+              <p className="mt-2 text-xs leading-5 text-muted-foreground">{tile.detail}</p>
             </div>
-          </section>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
       <div className="mt-5 border-t border-border pt-4">
         <p className="text-xs font-semibold">Platform support queue</p>
         {queueReason ? <p className="mt-2 text-xs leading-5 text-muted-foreground">{queueReason}</p> : threads.length === 0
@@ -3123,7 +2859,6 @@ export function AdminSurface({
   const [extraCases, setExtraCases] = useState<Record<string, number>>({});
   const [forcePullPrice, setForcePullPrice] = useState("$19");
   const [monitoringSplitPercent, setMonitoringSplitPercent] = useState(40);
-  const [intelDecisions, setIntelDecisions] = useState<Record<string, "promoted" | "rejected">>({});
   const [knowledgePages, setKnowledgePages] = useState<KnowledgePage[]>(KNOWLEDGE_PAGES);
   const [promptDrafts, setPromptDrafts] = useState<Record<string, string>>({});
   const [searchableWorkspaces, setSearchableWorkspaces] = useState<
@@ -3195,7 +2930,6 @@ export function AdminSurface({
         evaluatorThreshold,
         extraCases,
         forcePullPrice,
-        intelDecisions,
         knowledgePages,
         promptDrafts,
         recordAudit,
@@ -3207,7 +2941,6 @@ export function AdminSurface({
         setEvaluatorThreshold,
         setExtraCases,
         setForcePullPrice,
-        setIntelDecisions,
         setKnowledgePages,
         setPromptDrafts,
       }}
