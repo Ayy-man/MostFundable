@@ -65,6 +65,20 @@ describe("consumer optimization server read contract", () => {
     assert.doesNotMatch(source, /\.select\("\*"\)/);
   });
 
+  it("reads the narrative from the same row as the plan body", () => {
+    // Two queries could pair a narrative with a body from a different analysis run if a worker
+    // wrote between them, so the prose and the plan it describes must come off one row.
+    assert.match(source, /"body, readiness_score, narrative"/);
+  });
+
+  it("falls back to the pre-435 column list instead of failing the whole read", () => {
+    assert.match(source, /isMissingColumnError\(error, "narrative"\)/);
+    assert.match(source, /"body, readiness_score"/);
+    // The fallback keeps the same predicates, so it cannot widen scope while it narrows columns.
+    const fallback = source.slice(source.indexOf("isMissingColumnError"));
+    assert.match(fallback, /\.eq\("client_id", clientId\)/);
+  });
+
   it("takes the newest plan and the newest run rather than an arbitrary row", () => {
     assert.match(source, /\.order\("version", \{ ascending: false \}\)[\s\S]{0,40}\.limit\(1\)/);
     assert.match(source, /\.order\("ran_at", \{ ascending: false \}\)[\s\S]{0,40}\.limit\(1\)/);

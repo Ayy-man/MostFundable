@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  isMissingColumnError,
   OptimizationDataError,
   readConsumerOptimizationWith,
   type OptimizationGateway,
@@ -172,5 +173,133 @@ describe("consumer optimization read", () => {
       () => readConsumerOptimizationWith(session(), deps),
       (error: unknown) => error instanceof OptimizationDataError && error.code === "read_failed",
     );
+  });
+});
+
+/**
+ * A stored `plans.body` the projection accepts as a real plan, so the narrative cases below run
+ * through the `provenance: "plan"` path the worker actually writes rather than the flags fallback.
+ */
+const PLAN_BODY = {
+  businessChecklist: [],
+  personalChecklist: [],
+  readinessLabel: "Optimization",
+  readinessScore: 58,
+  schemaVersion: 1,
+};
+
+const STORED_NARRATIVE = {
+  businessSide: "Your business identifier is still missing; your funding team collects it.",
+  generation: { driver: "mock", model: "mock-1", promptVersion: 1 },
+  itemNotes: { credit_score_700: "Your middle score is 664, and the target is 700." },
+  nextSteps: [
+    {
+      detail: "Pay the balance down to $1,500 so it reports under 30% of its limit.",
+      itemKey: "utilization_under_30",
+      title: "Pay the revolving card down",
+    },
+  ],
+  schemaVersion: 1,
+  timeline: { band: "30-60 days", reason: "New balances take one statement cycle to report." },
+  verdict: "Not ready yet. 4 items to fix.",
+  whereYouStand: "Six of ten personal items are verified.",
+};
+
+function planRow(overrides: Record<string, unknown> = {}) {
+  return { body: PLAN_BODY as unknown, readinessScore: 58, ...overrides };
+}
+
+/**
+ * The narrative's whole journey from a stored jsonb value to the read model, one row at a time.
+ *
+ * These run through `readConsumerOptimizationWith` rather than against the guard directly, because
+ * what the handler owes the browser is not "the guard is strict" but "whatever that row held, the
+ * field this API serialises is either a valid narrative or null".
+ */
+describe("the narrative on the consumer optimization read", () => {
+  it("exposes a well-formed stored narrative", async () => {
+    const { gateway: deps } = gateway({
+      async readLatestPlan() {
+        return planRow({ narrative: STORED_NARRATIVE });
+      },
+    });
+
+    const result = await readConsumerOptimizationWith(session(), deps);
+
+    assert.ok(result?.narrative);
+    assert.equal(result.narrative.verdict, "Not ready yet. 4 items to fix.");
+    assert.equal(result.narrative.timeline.band, "30-60 days");
+    assert.equal(result.narrative.nextSteps[0].itemKey, "utilization_under_30");
+  });
+
+  it("answers null when the column is there and empty", async () => {
+    const { gateway: deps } = gateway({
+      async readLatestPlan() {
+        return planRow({ narrative: null });
+      },
+    });
+
+    assert.equal((await readConsumerOptimizationWith(session(), deps))?.narrative, null);
+  });
+
+  it("answers null when the stored value is malformed, rather than passing a hole to the browser", async () => {
+    for (const narrative of [
+      { ...STORED_NARRATIVE, timeline: { band: "next week", reason: "Soon." } },
+      { ...STORED_NARRATIVE, verdict: "" },
+      { ...STORED_NARRATIVE, estimatedFundingPotential: "$50,000" },
+      { schemaVersion: 1 },
+      "Not ready yet.",
+    ]) {
+      const { gateway: deps } = gateway({
+        async readLatestPlan() {
+          return planRow({ narrative });
+        },
+      });
+
+      const result = await readConsumerOptimizationWith(session(), deps);
+      assert.equal(result?.narrative, null, JSON.stringify(narrative));
+      // And the rest of the view is untouched: a bad narrative costs the card, never the checklist.
+      assert.equal(result?.provenance, "plan");
+    }
+  });
+
+  it("answers null on a database whose plans table has no narrative column yet", async () => {
+    // Migration 435 adds the column. Before it, the read cannot select it and hands back a row
+    // with the property absent — which must read as "no narrative", not as a failed read.
+    const { gateway: deps } = gateway({
+      async readLatestPlan() {
+        return planRow();
+      },
+    });
+
+    const result = await readConsumerOptimizationWith(session(), deps);
+
+    assert.equal(result?.narrative, null);
+    assert.equal(result?.readiness, 58);
+  });
+});
+
+describe("the missing-column test the server read falls back on", () => {
+  it("recognises Postgres undefined_column by its SQLSTATE", () => {
+    assert.equal(isMissingColumnError({ code: "42703", message: "whatever" }, "narrative"), true);
+  });
+
+  it("recognises it by message when the code is not forwarded", () => {
+    assert.equal(
+      isMissingColumnError({ message: "column plans.narrative does not exist" }, "narrative"),
+      true,
+    );
+  });
+
+  it("does not mistake another failure for a missing column", () => {
+    for (const error of [
+      null,
+      "42703",
+      { code: "42501", message: "permission denied for table plans" },
+      { message: "column plans.body does not exist" },
+      { message: "connection terminated" },
+    ]) {
+      assert.equal(isMissingColumnError(error, "narrative"), false, JSON.stringify(error));
+    }
   });
 });
