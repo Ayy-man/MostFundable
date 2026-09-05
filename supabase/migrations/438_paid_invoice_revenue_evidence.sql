@@ -26,6 +26,14 @@ create trigger consumer_paid_invoice_evidence_prevent_change
 before update or delete on public.consumer_paid_invoice_evidence
 for each row execute function private.prevent_row_change();
 
+-- Migration 350's erasure boundary: a row-immutable evidence table also refuses
+-- truncate, through an always-enabled statement trigger no role can disable.
+create trigger consumer_paid_invoice_evidence_no_truncate
+before truncate on public.consumer_paid_invoice_evidence
+for each statement execute function public.append_only_guard();
+alter table public.consumer_paid_invoice_evidence
+  enable always trigger consumer_paid_invoice_evidence_no_truncate;
+
 alter table public.consumer_paid_invoice_evidence enable row level security;
 alter table public.consumer_paid_invoice_evidence force row level security;
 revoke all on table public.consumer_paid_invoice_evidence from public, anon, authenticated, service_role;
