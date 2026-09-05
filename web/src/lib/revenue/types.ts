@@ -9,10 +9,17 @@ export const REVENUE_INCOMPLETE_CODES = [
 
 export type RevenueIncompleteCode = (typeof REVENUE_INCOMPLETE_CODES)[number];
 
-export type ConsumerSubscriptionInput = {
-  provider: "mock" | "stripe";
-  priceCents: number;
-};
+export type ConsumerSubscriptionInput =
+  | {
+      provider: "mock";
+      priceCents: number;
+    }
+  | {
+      paidInvoiceAmountCents: number;
+      paidInvoiceCount: number;
+      provider: "stripe";
+      priceCents: number;
+    };
 
 export type OperatorSubscriptionInput = {
   provider: "mock" | "stripe";

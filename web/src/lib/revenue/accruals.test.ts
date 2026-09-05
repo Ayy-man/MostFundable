@@ -98,25 +98,26 @@ test("refunds do not alter a platform-subscription referral basis", async () => 
   assert.equal(fake.posts[0]?.referrals[0]?.baseAmountCents, 55_500);
 });
 
-test("real-provider monitoring evidence stays incomplete and zero", async () => {
+test("Stripe monitoring basis uses this month's paid invoice evidence", async () => {
   const fake = memoryRepository(inputs({
-    consumerSubscriptions: [{ provider: "stripe", priceCents: 9_900 }],
+    consumerSubscriptions: [{ paidInvoiceAmountCents: 9_900, paidInvoiceCount: 1, provider: "stripe", priceCents: 9_900 }],
   }));
   await runBillingAccrual(`org:${ORG_ID}`, "2026-08", {
     env: { MONITORING_SPLIT_PCT: "20" },
     repository: fake.repository,
   });
-  assert.equal(fake.posts[0]?.operator.baseAmountCents, 0);
-  assert.equal(fake.posts[0]?.operator.amountCents, 0);
-  assert.equal(fake.posts[0]?.operator.isComplete, false);
-  assert.equal(fake.posts[0]?.operator.incompleteCode, "paid_invoice_evidence_missing");
+  assert.equal(fake.posts[0]?.operator.baseAmountCents, 9_900);
+  assert.equal(fake.posts[0]?.operator.amountCents, 1_980);
+  assert.equal(fake.posts[0]?.operator.isComplete, true);
+  assert.equal(fake.posts[0]?.operator.incompleteCode, null);
 });
 
-test("mixed consumer providers make the whole consumer basis incomplete", async () => {
+test("missing Stripe evidence contributes zero without discarding paid or mock rows", async () => {
   const fake = memoryRepository(inputs({
     consumerSubscriptions: [
       { provider: "mock", priceCents: 4_900 },
-      { provider: "stripe", priceCents: 4_900 },
+      { paidInvoiceAmountCents: 0, paidInvoiceCount: 0, provider: "stripe", priceCents: 4_900 },
+      { paidInvoiceAmountCents: 9_900, paidInvoiceCount: 1, provider: "stripe", priceCents: 9_900 },
     ],
     referral: { ...inputs().referral!, base: "consumer_subscriptions" },
   }));
@@ -124,7 +125,8 @@ test("mixed consumer providers make the whole consumer basis incomplete", async 
     env: { MONITORING_SPLIT_PCT: "20" },
     repository: fake.repository,
   });
-  assert.equal(fake.posts[0]?.referrals[0]?.amountCents, 0);
+  assert.equal(fake.posts[0]?.operator.baseAmountCents, 14_800);
+  assert.equal(fake.posts[0]?.referrals[0]?.amountCents, 2_960);
   assert.equal(fake.posts[0]?.referrals[0]?.incompleteCode, "paid_invoice_evidence_missing");
 });
 
@@ -205,6 +207,38 @@ test("repository requires an explicit nonnegative integer refund total, includin
         repository.readAccrualInputs(ORG_ID, "2026-08-01"),
         (error: unknown) => error instanceof RevenueRepositoryError && error.message === "REVENUE_INPUT_INVALID",
       );
+    }
+  }
+});
+
+test("repository maps Stripe invoice totals and rejects malformed evidence", async () => {
+  for (const [evidence, accepted] of [
+    [{ paid_invoice_amount_cents: 9_900, paid_invoice_count: 1 }, true],
+    [{ paid_invoice_amount_cents: 9_900, paid_invoice_count: undefined }, false],
+    [{ paid_invoice_amount_cents: -1, paid_invoice_count: 1 }, false],
+  ] as const) {
+    const repository = createRevenueRepository({
+      async rpc() {
+        return {
+          data: {
+            consumer_subscriptions: [{ provider: "stripe", price_cents: 9_900, ...evidence }],
+            operator_org_id: ORG_ID,
+            operator_subscription: null,
+            org_base_price_cents: 49_700,
+            org_seat_price_cents: 2_900,
+            referral: null,
+            refund_amount_cents: 0,
+          },
+          error: null,
+        };
+      },
+    });
+    if (accepted) {
+      assert.deepEqual((await repository.readAccrualInputs(ORG_ID, "2026-08-01")).consumerSubscriptions, [{
+        paidInvoiceAmountCents: 9_900, paidInvoiceCount: 1, provider: "stripe", priceCents: 9_900,
+      }]);
+    } else {
+      await assert.rejects(repository.readAccrualInputs(ORG_ID, "2026-08-01"), RevenueRepositoryError);
     }
   }
 });

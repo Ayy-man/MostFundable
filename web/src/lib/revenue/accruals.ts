@@ -49,17 +49,24 @@ function consumerBasis(
   if (rows.length === 0) {
     return { baseAmountCents: 0, incompleteCode: "consumer_subscriptions_missing", isComplete: false, sourceRowCount: 0 };
   }
-  if (rows.some((row) => row.provider === "stripe")) {
-    return { baseAmountCents: 0, incompleteCode: "paid_invoice_evidence_missing", isComplete: false, sourceRowCount: 0 };
+  let paidInvoiceEvidenceMissing = false;
+  let sourceRowCount = 0;
+  let totalCents = 0;
+  for (const row of rows) {
+    if (row.provider === "mock") {
+      totalCents += row.priceCents;
+      sourceRowCount += 1;
+    } else {
+      totalCents += row.paidInvoiceAmountCents;
+      sourceRowCount += row.paidInvoiceCount;
+      paidInvoiceEvidenceMissing ||= row.paidInvoiceCount === 0;
+    }
   }
   return {
-    baseAmountCents: Math.max(
-      0,
-      rows.reduce((sum, row) => sum + row.priceCents, 0) - refundAmountCents,
-    ),
-    incompleteCode: null,
-    isComplete: true,
-    sourceRowCount: rows.length,
+    baseAmountCents: Math.max(0, totalCents - refundAmountCents),
+    incompleteCode: paidInvoiceEvidenceMissing ? "paid_invoice_evidence_missing" : null,
+    isComplete: !paidInvoiceEvidenceMissing,
+    sourceRowCount,
   };
 }
 

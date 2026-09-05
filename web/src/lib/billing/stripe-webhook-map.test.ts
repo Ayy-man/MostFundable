@@ -39,6 +39,38 @@ describe("mapWebhook on the pinned api version", () => {
     assert.equal(parsed.eventType, "invoice.paid");
   });
 
+  it("carries the paid invoice receipt fields needed by revenue accrual", () => {
+    const parsed = mapWebhook(event("invoice.paid", {
+      amount_paid: 4_900,
+      currency: "usd",
+      id: "in_paid_receipt",
+      parent: { subscription_details: { subscription: "sub_paid_receipt" }, type: "subscription_details" },
+      period_end: 1_788_000_000,
+      period_start: 1_786_000_000,
+      status_transitions: { paid_at: 1_786_100_000 },
+    }));
+
+    assert.deepEqual({
+      amount: parsed.invoiceAmountPaidCents,
+      currency: parsed.currency,
+      invoice: parsed.invoiceRef,
+      paidAt: parsed.invoicePaidAt,
+      periodEnd: parsed.invoicePeriodEnd,
+      periodStart: parsed.invoicePeriodStart,
+      provider: parsed.provider,
+      subscription: parsed.subscriptionRef,
+    }, {
+      amount: 4_900,
+      currency: "usd",
+      invoice: "in_paid_receipt",
+      paidAt: new Date(1_786_100_000 * 1000).toISOString(),
+      periodEnd: new Date(1_788_000_000 * 1000).toISOString(),
+      periodStart: new Date(1_786_000_000 * 1000).toISOString(),
+      provider: "stripe",
+      subscription: "sub_paid_receipt",
+    });
+  });
+
   it("resolves it when the parent reference is expanded to an object", () => {
     const parsed = mapWebhook(
       event("invoice.paid", {

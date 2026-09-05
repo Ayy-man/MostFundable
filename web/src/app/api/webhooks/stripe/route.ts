@@ -20,6 +20,7 @@ type WebhookDependencies = {
   handleOperator(event: ParsedWebhook): Promise<boolean>;
   markStatus(eventId: string, leaseOwner: string, status: "failed" | "ignored" | "processed", errorCode?: string): Promise<void>;
   parse(rawBody: string, signature: string | null): Promise<ParsedWebhook>;
+  recordPaidInvoice(event: ParsedWebhook): Promise<boolean>;
   processConsumer(event: ParsedWebhook, leaseOwner: string): Promise<void>;
   record(event: ParsedWebhook, leaseOwner: string): Promise<boolean>;
   recordRefund(event: ParsedWebhook): Promise<boolean>;
@@ -36,6 +37,7 @@ const productionDependencies: WebhookDependencies = {
     if (!result.ok) throw result.error;
   },
   async parse(rawBody, signature) { return getBillingAdapter().parseWebhook(rawBody, signature); },
+  async recordPaidInvoice(event) { return (await import("@/lib/billing/paid-invoices")).recordPaidInvoiceEvidence(event); },
   processConsumer: processWebhookEvent,
   record: recordWebhookEvent,
   async recordRefund(event) { return (await import("@/lib/billing/refunds")).recordRefundObservation(event); },
@@ -88,6 +90,14 @@ export async function handleStripeWebhook(
   const leaseOwner = randomUUID();
   const fresh = await dependencies.record(event, leaseOwner);
   if (!fresh) return new Response("ok", { status: 200 });
+
+  if (event.provider === "stripe" && event.eventType === "invoice.paid") {
+    try {
+      await dependencies.recordPaidInvoice(event);
+    } catch {
+      return failClaim(dependencies, event.eventId, leaseOwner, "paid_invoice_persist_failed");
+    }
+  }
 
   if (await dependencies.billingOpsEnabled()) {
     try {

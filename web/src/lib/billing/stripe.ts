@@ -84,7 +84,9 @@ export function mapWebhook(event: Stripe.Event): ParsedWebhook {
   const object = event.data.object as unknown as Record<string, unknown>;
   const isSubscriptionEvent = event.type.startsWith("customer.subscription.");
   const isRefundEvent = event.type === "charge.refunded";
+  const isPaidInvoice = event.type === "invoice.paid";
   const invoice = record(object.invoice);
+  const statusTransitions = record(object.status_transitions);
 
   return {
     amountRefundedCents:
@@ -106,13 +108,25 @@ export function mapWebhook(event: Stripe.Event): ParsedWebhook {
           ? String(object.customer.id)
           : null,
     chargeRef: isRefundEvent && typeof object.id === "string" ? object.id : undefined,
-    currency: isRefundEvent && typeof object.currency === "string" ? object.currency : undefined,
+    currency:
+      (isRefundEvent || isPaidInvoice) && typeof object.currency === "string"
+        ? object.currency
+        : undefined,
     eventId: event.id,
     eventType: event.type,
+    invoiceAmountPaidCents:
+      isPaidInvoice && typeof object.amount_paid === "number"
+        ? object.amount_paid
+        : undefined,
+    invoicePaidAt: isPaidInvoice ? secondsToIso(statusTransitions?.paid_at) : undefined,
+    invoiceRef: isPaidInvoice && typeof object.id === "string" ? object.id : undefined,
+    invoicePeriodEnd: isPaidInvoice ? secondsToIso(object.period_end) : undefined,
+    invoicePeriodStart: isPaidInvoice ? secondsToIso(object.period_start) : undefined,
     nextPaymentAttemptAt:
       "next_payment_attempt" in object
         ? secondsToIso(object.next_payment_attempt)
         : undefined,
+    provider: "stripe",
     setupIntentRef:
       typeof object.setup_intent === "string" ? object.setup_intent : null,
     subscriptionRef: isSubscriptionEvent
