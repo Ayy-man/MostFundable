@@ -6,6 +6,7 @@ import {
   MOCK_NARRATIVE_MODEL,
   NARRATIVE_DEFAULT_MODEL,
   NARRATIVE_MAX_TOKENS,
+  NARRATIVE_NON_ZDR_MODEL,
   NARRATIVE_TIME_LIMIT_MS,
   createMockNarrativeDriver,
   createNarrativeDriver,
@@ -226,7 +227,7 @@ describe('openrouter narrative driver', () => {
     let sent: Record<string, unknown> | null = null;
     const driver = createOpenRouterNarrativeDriver({
       apiKey: 'key-value',
-      model: NARRATIVE_DEFAULT_MODEL,
+      model: NARRATIVE_NON_ZDR_MODEL,
       async fetch(_url, init) {
         sent = JSON.parse(String((init as RequestInit).body));
         const draft = {
@@ -247,7 +248,7 @@ describe('openrouter narrative driver', () => {
     const narrative = await driver.write(tinyPack(), PROMPT);
 
     const body = sent as unknown as Record<string, unknown>;
-    assert.equal(body.model, NARRATIVE_DEFAULT_MODEL);
+    assert.equal(body.model, NARRATIVE_NON_ZDR_MODEL);
     assert.deepEqual(body.reasoning, { effort: 'high', exclude: true });
     // The transport adds its own reasoning headroom on top of the caller's answer budget.
     assert.ok((body.max_tokens as number) >= NARRATIVE_MAX_TOKENS, 'the answer budget survives');
@@ -255,7 +256,7 @@ describe('openrouter narrative driver', () => {
     assert.equal(format.json_schema.strict, true);
     assert.equal(format.json_schema.schema.additionalProperties, false);
     assert.equal(narrative.generation.driver, 'openrouter');
-    assert.equal(narrative.generation.model, NARRATIVE_DEFAULT_MODEL);
+    assert.equal(narrative.generation.model, NARRATIVE_NON_ZDR_MODEL);
     assert.equal(NARRATIVE_TIME_LIMIT_MS, 120_000);
   });
 
@@ -265,7 +266,7 @@ describe('openrouter narrative driver', () => {
     let sent: Record<string, unknown> | null = null;
     const driver = createOpenRouterNarrativeDriver({
       apiKey: 'key-value',
-      model: NARRATIVE_DEFAULT_MODEL,
+      model: NARRATIVE_NON_ZDR_MODEL,
       async fetch(_url, init) {
         sent = JSON.parse(String((init as RequestInit).body));
         return new Response(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: '{}' } }] }), { status: 200 });

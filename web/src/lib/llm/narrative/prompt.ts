@@ -27,6 +27,7 @@
 import {
   BUSINESS_ITEM_KEYS_V2,
   NARRATIVE_PROMPT_KEY,
+  PERSONAL_ITEM_TITLES_V2,
   NARRATIVE_TIMELINE_BANDS_V1,
   PERSONAL_ITEM_KEYS_V2,
 } from './contract.ts';
@@ -119,6 +120,7 @@ const NARRATIVE_SYSTEM_V1 = [
   '',
   'Hard rules:',
   '- All money in the pack is already in whole dollars. Never rescale it, never add cents, never convert.',
+  '- Never write a checklist key, a state word or a field name in your prose. The keys and the states are how the pack is built, not how a person talks. Refer to an item by its plain title from the list below, and where an item cannot be established from the report, say "cannot be checked from the report yet" rather than naming the state.',
   '- Every number you write must appear in the facts pack. Do not compute a new one, do not round differently, do not total two of them together. A deterministic checker compares each number you write against the pack and discards the whole narrative when one does not match.',
   '- Never contradict a state, a label or a count in the pack.',
   '- Never state or imply what any lender or bank will decide, and never put a number on the chance of any future decision.',
@@ -132,7 +134,7 @@ const NARRATIVE_SYSTEM_V1 = [
   '- verdict: the funding-status line. It MUST begin with the pack\'s readinessLabel spelled exactly as the pack spells it, then the count: "Building Readiness. 4 items to fix." / "Near Ready. 1 item to fix." / "Ready. 0 items to fix." Use the pack\'s own label and its own counts, never a label of your own.',
   '- whereYouStand: 2 to 4 sentences. Why the score is what it is, and the single biggest thing holding it back, with its number.',
   '- nextSteps: 1 to 3 steps, highest impact first. Each has a short imperative title, a detail of 1 to 3 sentences carrying the concrete target number, and itemKey naming the checklist item the step moves. Use "none" for itemKey only when a step moves no single item.',
-  `- itemNotes: exactly one entry for each personal item whose state is "unverified", and no entry for any other item. One sentence each: fact, target, gap for this person. Personal item keys: ${PERSONAL_ITEM_KEYS_V2.join(', ')}.`,
+  `- itemNotes: exactly one entry for each personal item whose state is "unverified", and no entry for any other item. One sentence each: fact, target, gap for this person. The itemNotes keys and every itemKey field take the key spelling; your prose takes the title. Personal items, as key then title: ${PERSONAL_ITEM_KEYS_V2.map((key) => `${key} = "${PERSONAL_ITEM_TITLES_V2[key]}"`).join('; ')}.`,
   '- businessSide: 1 to 2 sentences on what the business checklist still needs and who supplies it.',
   `- timeline: band, chosen from exactly these values — ${NARRATIVE_TIMELINE_BANDS_V1.join(' | ')} — and reason, one or two sentences saying what makes it that band. Pick the band from the work the steps describe, not from anything you expect a lender to do.`,
   '',

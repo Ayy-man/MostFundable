@@ -27,6 +27,11 @@
  *                        leaves a factor row with nothing to say.
  *   STEP_ITEM_UNKNOWN    a step points at a checklist item the pack does not carry, so the surface
  *                        cannot link the step to a factor.
+ *   SCHEMA_LEAKED        a checklist key or a state token appears verbatim in the prose. Sonnet
+ *                        wrote "personal_information_confirmed is not_checkable" — schema-correct,
+ *                        factually right, and unreadable to the person it is addressed to. The
+ *                        model has the plain titles; leaking the identifier means it reached for
+ *                        the wrong one, and no consumer should ever meet a snake_case key.
  *   VERDICT_LABEL        the verdict does not open with the pack's own `readinessLabel`. The label
  *                        is a rules decision — three fixed strings, chosen from the score — and the
  *                        verdict is the one line where the consumer reads it back. A model that
@@ -39,7 +44,7 @@
 
 import { complianceLanguageCodes } from '../../compliance/language-rules.mjs';
 import { NARRATIVE_FIELD_LIMITS_V1 } from './prompt.ts';
-import { NARRATIVE_TIMELINE_BANDS_V1, PERSONAL_ITEM_KEYS_V2 } from './contract.ts';
+import { BUSINESS_ITEM_KEYS_V2, NARRATIVE_TIMELINE_BANDS_V1, PERSONAL_ITEM_KEYS_V2 } from './contract.ts';
 
 import type { FactsPackV2, NarrativeV1 } from './contract.ts';
 
@@ -51,6 +56,7 @@ export const NARRATIVE_CHECK_CODES = Object.freeze([
   'ITEM_NOTE_MISMATCH',
   'STEP_ITEM_UNKNOWN',
   'VERDICT_LABEL',
+  'SCHEMA_LEAKED',
 ] as const);
 export type NarrativeCheckCode = (typeof NARRATIVE_CHECK_CODES)[number];
 
@@ -296,6 +302,38 @@ function itemNoteCodes(narrative: NarrativeV1, pack: FactsPackV2): string[] {
  * the same claim and failing the second would be a checker enforcing typography. Everything after
  * the label is prose the model is free to write.
  */
+/**
+ * Every token that belongs to the schema rather than to the reader.
+ *
+ * The seventeen checklist keys and the three state words. Built from the contract's own arrays, so
+ * an item added to the checklist is covered the day it is added and nobody has to remember this
+ * list — the same reason `allowedNumbers` walks the pack instead of naming its fields.
+ */
+const SCHEMA_TOKENS: readonly string[] = Object.freeze([
+  ...PERSONAL_ITEM_KEYS_V2,
+  ...BUSINESS_ITEM_KEYS_V2,
+  'verified',
+  'unverified',
+  'not_checkable',
+]);
+
+/**
+ * No schema identifier reaches the page.
+ *
+ * Matched on word boundaries against the lower-cased prose. `verified` is a real English word and
+ * "unverified" contains "verified", but neither is a false positive worth an exception: the founder
+ * writes "we could not confirm" and "still outstanding", never the state token, so a narrative that
+ * reaches for the schema's vocabulary has stopped writing for the consumer. The one attempt this
+ * costs is cheaper than one page saying `personal_information_confirmed`.
+ */
+function schemaLeakCodes(narrative: NarrativeV1): string[] {
+  const prose = proseFields(narrative).join('\n').toLowerCase();
+  for (const token of SCHEMA_TOKENS) {
+    if (new RegExp(`\\b${token}\\b`).test(prose)) return ['SCHEMA_LEAKED'];
+  }
+  return [];
+}
+
 function verdictLabelCodes(narrative: NarrativeV1, pack: FactsPackV2): string[] {
   const label = pack.readinessLabel.trim().toLowerCase();
   const verdict = narrative.verdict.trimStart().toLowerCase();
@@ -327,6 +365,7 @@ export function checkNarrative(narrative: unknown, pack: FactsPackV2): Narrative
     ...itemNoteCodes(value, pack),
     ...stepItemCodes(value, pack),
     ...verdictLabelCodes(value, pack),
+    ...schemaLeakCodes(value),
   ]);
   const sorted = [...codes].sort();
   return { approved: sorted.length === 0, codes: sorted };

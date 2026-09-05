@@ -17,8 +17,23 @@ export const NARRATIVE_DRIVER_SPEC = {
   requires: { openrouter: ['OPENROUTER_API_KEY'] },
 } as const satisfies DriverSpec;
 
-/** The model the 2026-09-05 comparison chose for this job. `NARRATIVE_MODEL` overrides it. */
-export const NARRATIVE_DEFAULT_MODEL = 'openai/gpt-5.6-luna';
+/**
+ * The model this lane runs on. `NARRATIVE_MODEL` overrides it.
+ *
+ * Sonnet 5 because the transport requires zero data retention and the OpenAI models have no ZDR
+ * endpoint on OpenRouter: `openai/gpt-5.6-luna`, `-luna-pro`, `-terra` and `-sol` all return 404
+ * "No endpoints found matching your data policy (Zero data retention)" under `provider.zdr: true`
+ * (measured 2026-09-05), so the strongest scorer on the twenty-scenario eval is a model this
+ * product cannot reach without giving up a privacy guarantee it makes about credit-derived data.
+ *
+ * On the eval itself Sonnet 5 and luna tie at 20/20 and Haiku 4.5 scores 10/20, so ZDR is the whole
+ * decision rather than a tie-break: 20 cases cost $0.81 on Sonnet. luna stays available through
+ * `NARRATIVE_MODEL` for a deployment that does not require ZDR.
+ */
+export const NARRATIVE_DEFAULT_MODEL = 'anthropic/claude-sonnet-5';
+
+/** The strongest non-ZDR option, kept nameable so the reason it is not the default stays visible. */
+export const NARRATIVE_NON_ZDR_MODEL = 'openai/gpt-5.6-luna';
 
 export const MOCK_NARRATIVE_MODEL = 'template-narrative-v1';
 
@@ -44,6 +59,11 @@ export function narrativeModelFrom(env: EnvSource): string {
  */
 export function narrativeReasoningFor(model: string): 'high' | 'off' | undefined {
   if (model.startsWith('openai/')) return 'high';
+  // `'off'` rather than `undefined`, and the distinction is the whole point: `undefined` falls
+  // through to the transport's own default of `low`, which still sends a reasoning block. `'off'`
+  // is the only value that omits it. Sonnet scored 20/20 without one, and it routes either way
+  // (all of no-block, low, and low+exclude reach Bedrock under ZDR — measured 2026-09-05), so this
+  // is simply not paying for reasoning the eval showed the job does not need.
   if (model.startsWith('anthropic/')) return 'off';
   return undefined;
 }
