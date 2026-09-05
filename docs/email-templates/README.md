@@ -1,6 +1,6 @@
 # Email templates
 
-One file per provider template id in `web/src/lib/email/templates.ts`. Paste each file's HTML into the Resend template with the same id (subjects below); the consumer templates take the two variables the driver sends, `FIRST_NAME` and `APP_PATH`, in Resend's triple-brace syntax. `operator-card-failure` takes none. Copy is the registry's copy verbatim, plus the fixed footer; nothing in a message names a score, an outcome or a promise.
+One file per provider template id in `web/src/lib/email/templates.ts`. Run `RESEND_API_KEY=... node web/scripts/publish-resend-templates.mjs` (add `--dry-run` first) to create or update and publish them in Resend under these aliases (subjects below), or paste each file by hand; the consumer templates take the two variables the driver sends, `FIRST_NAME` and `APP_PATH`, in Resend's triple-brace syntax. `operator-card-failure` takes none. Copy is the registry's copy verbatim, plus the fixed footer; nothing in a message names a score, an outcome or a promise.
 
 | Template | Subject |
 | --- | --- |

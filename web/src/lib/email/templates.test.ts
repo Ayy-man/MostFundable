@@ -90,13 +90,13 @@ describe("consumer event email templates", () => {
     assert.equal(subjects.size, CONSUMER_EMAIL_TEMPLATES.length, "each event has its own subject");
   });
 
-  it("sends only the first name and the app path to the provider", () => {
+  it("sends the first name as GIVEN_NAME and the app path to the provider", () => {
     const variables = buildProviderVariables("consumer_team_message", {
       APP_PATH: "/consumer",
       DELIVERY_REFERENCE: DELIVERY,
       FIRST_NAME: "Dana",
     });
-    assert.deepEqual(variables, { APP_PATH: "/consumer", FIRST_NAME: "Dana" });
+    assert.deepEqual(variables, { APP_PATH: "/consumer", GIVEN_NAME: "Dana" });
     assert.equal(
       deliveryReference("consumer_team_message", {
         APP_PATH: "/consumer",

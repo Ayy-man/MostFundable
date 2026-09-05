@@ -176,9 +176,11 @@ export function buildProviderVariables<T extends EmailTemplate>(
   if (template === "operator_card_failure") return Object.freeze({});
   if (isConsumerEmailTemplate(template)) {
     const consumer = valid as ConsumerEmailTemplateVars;
+    // Resend reserves FIRST_NAME (with LAST_NAME, EMAIL and UNSUBSCRIBE_URL) for its own
+    // contact fields and rejects a send that supplies it, so the provider-side key is GIVEN_NAME.
     return Object.freeze({
       APP_PATH: consumer.APP_PATH,
-      FIRST_NAME: consumer.FIRST_NAME,
+      GIVEN_NAME: consumer.FIRST_NAME,
     });
   }
   throw new Error("EMAIL_TEMPLATE_INVALID");
