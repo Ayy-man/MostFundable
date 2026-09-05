@@ -4,7 +4,7 @@ Production evidence checked 2026-09-04: `9d290a3fb01ac5f656179f7946d2f4df9ece116
 
 ## Current source position
 
-This repository contains the MVP application, database migrations through 440, and automated coverage for the included source.
+This repository contains the MVP application, database migrations through 441, and automated coverage for the included source.
 
 The product supports four roles: consumer, operator, affiliate, and platform administrator. The source includes tenant boundaries, authentication routes, enrollment and consent flows, readiness and funding workflows, client and task management, applications, fee agreements, support, privacy-request intake, affiliate workflows, and administration tools.
 
