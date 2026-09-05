@@ -79,8 +79,8 @@ select enum_has_labels(
 select enum_has_labels(
   'public',
   'outcome_notification_kind',
-  array['outcome_review_approved', 'outcome_review_removed', 'crs_alert'],
-  'notification kind preserves Phase 11 values and appends the ancillary alert kind'
+  array['outcome_review_approved', 'outcome_review_removed', 'crs_alert', 'stage_change', 'analysis_complete', 'refresh_result', 'enrollment_milestone', 'document', 'team_message'],
+  'notification kind preserves Phase 11 values and carries the ancillary and consumer event kinds (migrations 140 and 440)'
 );
 
 -- APPS-02, stated as literally as the requirement allows: the entry counts

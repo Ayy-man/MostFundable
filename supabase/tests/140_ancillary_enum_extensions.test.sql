@@ -26,8 +26,8 @@ select has_type(
 select enum_has_labels(
   'public',
   'outcome_notification_kind',
-  array['outcome_review_approved', 'outcome_review_removed', 'crs_alert'],
-  'notification kind preserves both existing values and appends the CRS alert kind'
+  array['outcome_review_approved', 'outcome_review_removed', 'crs_alert', 'stage_change', 'analysis_complete', 'refresh_result', 'enrollment_milestone', 'document', 'team_message'],
+  'notification kind preserves both existing values, the CRS alert kind and the migration 440 consumer event kinds'
 );
 
 select * from finish();

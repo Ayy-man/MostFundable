@@ -14,19 +14,39 @@ import {
   type ConsumerNotificationPreferences,
 } from "./preferences.ts";
 
+import type { Database } from "@/lib/db/types";
 import type { NotificationEventType } from "./types.ts";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+type OutcomeNotificationKind = Database["public"]["Enums"]["outcome_notification_kind"];
+
 /**
- * The in-app notification kinds that exist as durable rows today, mapped onto the feed's event
- * vocabulary. The other six event types are derived at read time and have no delivery row to hang
- * an email off yet; when one gains a row, it joins this map and inherits the whole path.
+ * Every in-app notification kind that reaches the dispatcher, mapped onto the feed's event
+ * vocabulary. Migration 440 gave the six read-time event types a durable row of their own, written
+ * by a trigger on each source table, so this map now covers every category a consumer can toggle;
+ * `private.consumer_notification_event_type` in the database is the same map, and the test beside
+ * this file holds the two to the full event-type list. The key type pins each entry to a label the
+ * enum carries; `outcome_review_removed` is deliberately absent because it is never queued.
  */
-const EVENT_TYPE_BY_KIND: Readonly<Record<string, NotificationEventType>> = Object.freeze({
+export const EVENT_TYPE_BY_KIND: Readonly<
+  Partial<Record<OutcomeNotificationKind, NotificationEventType>>
+> = Object.freeze({
   crs_alert: "monitoring_alert",
   outcome_review_approved: "application_update",
+  stage_change: "stage_change",
+  analysis_complete: "analysis_complete",
+  refresh_result: "refresh_result",
+  enrollment_milestone: "enrollment_milestone",
+  document: "document",
+  team_message: "team_message",
 });
+
+function eventTypeForKind(kind: string): NotificationEventType | undefined {
+  return Object.hasOwn(EVENT_TYPE_BY_KIND, kind)
+    ? EVENT_TYPE_BY_KIND[kind as OutcomeNotificationKind]
+    : undefined;
+}
 
 interface Result<T> { data: T | null; error: unknown }
 
@@ -128,13 +148,15 @@ export async function dispatchConsumerNotificationEmailForDelivery(
       .eq("id", input.notificationId)
       .maybeSingle();
     if (error) throw new Error("NOTIFICATION_EMAIL_SOURCE_READ_FAILED");
+    const mapped = data !== null && typeof data.kind === "string"
+      ? eventTypeForKind(data.kind)
+      : undefined;
     if (
       data === null
-      || typeof data.kind !== "string"
+      || mapped === undefined
       || typeof data.recipient_profile_id !== "string"
-      || !Object.hasOwn(EVENT_TYPE_BY_KIND, data.kind)
     ) return { status: "skipped", reason: "input_invalid" };
-    eventType = EVENT_TYPE_BY_KIND[data.kind];
+    eventType = mapped;
     recipientProfileId = data.recipient_profile_id;
   } catch {
     return { status: "failed", reason: "recipient_read" };

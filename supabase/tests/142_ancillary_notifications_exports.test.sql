@@ -92,8 +92,8 @@ select is(
 select enum_has_labels(
   'public',
   'outcome_notification_kind',
-  array['outcome_review_approved', 'outcome_review_removed', 'crs_alert'],
-  'the notification kind keeps both historical values and adds CRS alert'
+  array['outcome_review_approved', 'outcome_review_removed', 'crs_alert', 'stage_change', 'analysis_complete', 'refresh_result', 'enrollment_milestone', 'document', 'team_message'],
+  'the notification kind keeps both historical values, CRS alert and the migration 440 consumer event kinds'
 );
 
 insert into auth.users (id, email)
@@ -478,8 +478,8 @@ select is(
 );
 select matches(
   pg_get_functiondef('private.queue_outcome_notification_delivery()'::regprocedure),
-  'outcome_review_approved.*crs_alert',
-  'the delivery trigger contains only the ratified event kinds'
+  'private.consumer_notification_event_type\(new.kind\)',
+  'the delivery trigger queues exactly the kinds the consumer category map names (migration 440)'
 );
 
 select * from finish();

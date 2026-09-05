@@ -3091,39 +3091,66 @@ export type Database = {
       outcome_notifications: {
         Row: {
           client_id: string | null
+          consent_id: string | null
           created_at: string
           delivered_at: string | null
+          document_upload_id: string | null
+          enrollment_milestone_client_id: string | null
+          enrollment_milestone_kind:
+            | Database["public"]["Enums"]["enrollment_milestone_kind"]
+            | null
           id: string
           kind: Database["public"]["Enums"]["outcome_notification_kind"]
           monitoring_event_id: string | null
           org_id: string
           outcome_id: string | null
+          plan_id: string | null
           read_at: string | null
           recipient_profile_id: string
+          stage_history_id: string | null
+          support_message_id: string | null
         }
         Insert: {
           client_id?: string | null
+          consent_id?: string | null
           created_at?: string
           delivered_at?: string | null
+          document_upload_id?: string | null
+          enrollment_milestone_client_id?: string | null
+          enrollment_milestone_kind?:
+            | Database["public"]["Enums"]["enrollment_milestone_kind"]
+            | null
           id?: string
           kind: Database["public"]["Enums"]["outcome_notification_kind"]
           monitoring_event_id?: string | null
           org_id: string
           outcome_id?: string | null
+          plan_id?: string | null
           read_at?: string | null
           recipient_profile_id: string
+          stage_history_id?: string | null
+          support_message_id?: string | null
         }
         Update: {
           client_id?: string | null
+          consent_id?: string | null
           created_at?: string
           delivered_at?: string | null
+          document_upload_id?: string | null
+          enrollment_milestone_client_id?: string | null
+          enrollment_milestone_kind?:
+            | Database["public"]["Enums"]["enrollment_milestone_kind"]
+            | null
           id?: string
           kind?: Database["public"]["Enums"]["outcome_notification_kind"]
           monitoring_event_id?: string | null
           org_id?: string
           outcome_id?: string | null
+          plan_id?: string | null
           read_at?: string | null
           recipient_profile_id?: string
+          stage_history_id?: string | null
+          support_message_id?: string | null
         }
         Relationships: [
           {
@@ -3139,6 +3166,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "specialist_default_client_view"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outcome_notifications_consent_id_fkey"
+            columns: ["consent_id"]
+            isOneToOne: false
+            referencedRelation: "consents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outcome_notifications_document_upload_id_fkey"
+            columns: ["document_upload_id"]
+            isOneToOne: false
+            referencedRelation: "document_uploads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outcome_notifications_enrollment_milestone_fkey"
+            columns: ["enrollment_milestone_client_id", "enrollment_milestone_kind"]
+            isOneToOne: false
+            referencedRelation: "enrollment_milestones"
+            referencedColumns: ["client_id", "kind"]
           },
           {
             foreignKeyName: "outcome_notifications_monitoring_event_id_fkey"
@@ -3169,10 +3217,31 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "outcome_notifications_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "outcome_notifications_recipient_profile_id_fkey"
             columns: ["recipient_profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outcome_notifications_stage_history_id_fkey"
+            columns: ["stage_history_id"]
+            isOneToOne: false
+            referencedRelation: "stage_history"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outcome_notifications_support_message_id_fkey"
+            columns: ["support_message_id"]
+            isOneToOne: false
+            referencedRelation: "support_messages"
             referencedColumns: ["id"]
           },
         ]
@@ -7111,6 +7180,12 @@ export type Database = {
         | "outcome_review_approved"
         | "outcome_review_removed"
         | "crs_alert"
+        | "stage_change"
+        | "analysis_complete"
+        | "refresh_result"
+        | "enrollment_milestone"
+        | "document"
+        | "team_message"
       outcome_review_state: "pending" | "approved" | "removed"
       outcome_state: "counted" | "removed"
       prompt_activation_hold_reason: "evaluation_evidence_missing"
@@ -7374,6 +7449,12 @@ export const Constants = {
         "outcome_review_approved",
         "outcome_review_removed",
         "crs_alert",
+        "stage_change",
+        "analysis_complete",
+        "refresh_result",
+        "enrollment_milestone",
+        "document",
+        "team_message",
       ],
       outcome_review_state: ["pending", "approved", "removed"],
       outcome_state: ["counted", "removed"],

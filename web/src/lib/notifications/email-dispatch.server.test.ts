@@ -1,11 +1,16 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { dispatchConsumerNotificationEmailForDelivery } from "./email-dispatch.server.ts";
+import {
+  dispatchConsumerNotificationEmailForDelivery,
+  EVENT_TYPE_BY_KIND,
+} from "./email-dispatch.server.ts";
+import { CONSUMER_NOTIFICATION_EMAIL_TEMPLATES } from "./email-dispatch.ts";
 import { CONSUMER_NOTIFICATION_EVENT_TYPES } from "./preferences.ts";
 
 import type { ConsumerNotificationEmailDb } from "./email-dispatch.server.ts";
 import type { EmailDriver, EmailSendInput } from "@/lib/email/types";
+import type { NotificationEventType } from "./types.ts";
 
 const DELIVERY = "84000000-0000-4000-8000-000000000201";
 const NOTIFICATION = "84000000-0000-4000-8000-000000000301";
@@ -209,5 +214,64 @@ describe("consumer notification email production wiring", () => {
       { status: "skipped", reason: "recipient_unavailable" },
     );
     assert.deepEqual(sent, []);
+  });
+});
+
+function preferencesWithEmailOn(eventTypes: readonly NotificationEventType[]): Rows[string] {
+  return CONSUMER_NOTIFICATION_EVENT_TYPES.map((eventType) => ({
+    email_enabled: eventTypes.includes(eventType),
+    event_type: eventType,
+    in_app_enabled: true,
+  }));
+}
+
+describe("consumer notification kind map", () => {
+  it("reaches every consumer event type through at least one durable kind", () => {
+    const reached = new Set(Object.values(EVENT_TYPE_BY_KIND));
+    for (const eventType of CONSUMER_NOTIFICATION_EVENT_TYPES) {
+      assert.ok(reached.has(eventType), `${eventType} has no notification kind to email from`);
+    }
+  });
+
+  it("carries the eight queued kinds and skips the removed review", () => {
+    // The key type already pins every entry to a label the database enum carries.
+    assert.equal(Object.keys(EVENT_TYPE_BY_KIND).length, 8);
+    assert.equal(Object.hasOwn(EVENT_TYPE_BY_KIND, "outcome_review_removed"), false);
+  });
+
+  it("emails each kind through its event's template, gated by that event's own toggle", async () => {
+    for (const [kind, eventType] of Object.entries(EVENT_TYPE_BY_KIND)) {
+      const sent: EmailSendInput[] = [];
+      const on = await withEmailConfigured(() => dispatchConsumerNotificationEmailForDelivery(
+        { deliveryId: DELIVERY, notificationId: NOTIFICATION },
+        {
+          db: database(rows({
+            outcome_notifications: [{ kind, recipient_profile_id: PROFILE }],
+            consumer_notification_preferences: preferencesWithEmailOn([eventType]),
+          })),
+          driver: driver(sent),
+        },
+      ));
+      assert.deepEqual(on, {
+        status: "sent",
+        template: CONSUMER_NOTIFICATION_EMAIL_TEMPLATES[eventType],
+        receiptId: "84000000-0000-4000-8000-000000000501",
+      }, kind);
+      assert.equal(sent.length, 1, kind);
+
+      const others = CONSUMER_NOTIFICATION_EVENT_TYPES.filter((entry) => entry !== eventType);
+      const off = await withEmailConfigured(() => dispatchConsumerNotificationEmailForDelivery(
+        { deliveryId: DELIVERY, notificationId: NOTIFICATION },
+        {
+          db: database(rows({
+            outcome_notifications: [{ kind, recipient_profile_id: PROFILE }],
+            consumer_notification_preferences: preferencesWithEmailOn(others),
+          })),
+          driver: driver(sent),
+        },
+      ));
+      assert.deepEqual(off, { status: "skipped", reason: "preference_off" }, kind);
+      assert.equal(sent.length, 1, `${kind} sent while its toggle was off`);
+    }
   });
 });
