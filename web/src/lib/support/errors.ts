@@ -18,8 +18,11 @@ import { SUPPORT_DRAFT_DRIVER_UNAVAILABLE } from './driver.ts';
  *
  * `SUPPORT_REQUEST_INVALID` is the routes' own: a payload that fails validation
  * before any database call. The fourteen after it are raised by migrations 100,
- * 101, 385 and 386, two more by this lane's TypeScript, and `SUPPORT_UNAVAILABLE` is the
- * catch-all that anything unrecognized collapses into. One union rather than a
+ * 101, 385 and 386, three more by this lane's TypeScript
+ * (`SUPPORT_MESSAGE_LANGUAGE` among them: a person's own message body tripped
+ * the compliance language battery, pre-launch defect C5), and
+ * `SUPPORT_UNAVAILABLE` is the catch-all that anything unrecognized collapses
+ * into. One union rather than a
  * separate route vocabulary, so a client parses one shape and plan 13-06's
  * scanner has one list to check.
  */
@@ -39,6 +42,7 @@ export type SupportErrorCode =
   | 'SUPPORT_THREAD_SCOPE_INVALID'
   | 'SUPPORT_AUTHOR_ROLE_MISMATCH'
   | 'SUPPORT_DRAFT_PAIRING_INVALID'
+  | 'SUPPORT_MESSAGE_LANGUAGE'
   | 'SUPPORT_DRAFT_DRIVER_UNAVAILABLE'
   | 'SUPPORT_CONFIG_INVALID'
   | 'SUPPORT_UNAVAILABLE';
@@ -73,6 +77,10 @@ const STATUS_BY_CODE: Readonly<Record<SupportErrorCode, number>> = {
   SUPPORT_THREAD_SCOPE_INVALID: 422,
   SUPPORT_AUTHOR_ROLE_MISMATCH: 500,
   SUPPORT_DRAFT_PAIRING_INVALID: 500,
+  // A well-formed message whose wording the platform may not put in front of a
+  // client. The same reading SUPPORT_DRAFT_BODY_MISMATCH gets: the request is
+  // valid, the content is what cannot be sent.
+  SUPPORT_MESSAGE_LANGUAGE: 422,
   SUPPORT_DRAFT_DRIVER_UNAVAILABLE: 503,
   SUPPORT_CONFIG_INVALID: 500,
   SUPPORT_UNAVAILABLE: 500,
@@ -93,6 +101,24 @@ export class SupportError extends Error {
     this.name = 'SupportError';
     this.code = code;
     this.status = STATUS_BY_CODE[code];
+  }
+}
+
+/**
+ * A human-typed message body refused by the compliance language battery.
+ *
+ * The one `SupportError` that carries something beyond its code: the rule ids
+ * that fired, so the surface can say which phrase to remove. The ids are the
+ * battery's own `LANGUAGE_Cnn` labels — never the matched text, which would
+ * echo the prohibited phrase back through the response.
+ */
+export class SupportMessageLanguageError extends SupportError {
+  readonly codes: readonly string[];
+
+  constructor(codes: readonly string[]) {
+    super('SUPPORT_MESSAGE_LANGUAGE');
+    this.name = 'SupportMessageLanguageError';
+    this.codes = Object.freeze([...codes]);
   }
 }
 
@@ -140,7 +166,11 @@ export function toSupportError(value: unknown): SupportError {
 
 export interface SupportHttpResponse {
   readonly status: number;
-  readonly body: { readonly error: SupportErrorCode; readonly correlationId?: string };
+  readonly body: {
+    readonly error: SupportErrorCode;
+    readonly correlationId?: string;
+    readonly codes?: readonly string[];
+  };
 }
 
 /**
@@ -157,9 +187,15 @@ function isUnrecognized(value: unknown, code: SupportErrorCode): boolean {
  * The response shape every support route answers a failure with: one status and
  * one key. No message, no hint, no detail, no field list — a client learns what
  * class of thing went wrong and nothing about the schema behind it.
+ *
+ * The one addition is `codes` on a language refusal: rule ids, not text, so
+ * the surface can point at the rule without the response repeating the phrase.
  */
 export function toHttpResponse(value: unknown): SupportHttpResponse {
   const error = toSupportError(value);
+  if (error instanceof SupportMessageLanguageError) {
+    return { status: error.status, body: { error: error.code, codes: error.codes } };
+  }
   if (isUnrecognized(value, error.code)) {
     const correlationId = recordRouteFailure({
       cause: value,

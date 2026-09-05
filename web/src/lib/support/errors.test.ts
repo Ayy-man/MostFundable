@@ -7,6 +7,7 @@ import { SupportDraftDriverUnavailableError } from './driver.ts';
 import {
   SUPPORT_ERROR_CODES,
   SupportError,
+  SupportMessageLanguageError,
   supportErrorStatus,
   toHttpResponse,
   toSupportError,
@@ -93,8 +94,9 @@ describe('support error mapping', () => {
     );
 
     // Everything the database can raise, plus request validation, the driver,
-    // the config error, and the catch-all — the four this lane raises itself.
-    assert.equal(SUPPORT_ERROR_CODES.length, raised.size + 4);
+    // the config error, the language refusal (C5), and the catch-all — the
+    // five this lane raises itself.
+    assert.equal(SUPPORT_ERROR_CODES.length, raised.size + 5);
     for (const code of raised) {
       assert.ok(SUPPORT_ERROR_CODES.includes(code as SupportErrorCode), code);
     }
@@ -166,6 +168,22 @@ describe('support error mapping', () => {
     // message is still dropped on the floor, as every token asserted above proves.
     assert.deepEqual(Object.keys(response.body).sort(), ['correlationId', 'error']);
     assert.equal(response.body.error, 'SUPPORT_UNAVAILABLE');
+  });
+
+  it('answers a language refusal with the code and the rule ids, and nothing else', () => {
+    const error = new SupportMessageLanguageError(['LANGUAGE_C01', 'LANGUAGE_C21']);
+    assert.equal(error.code, 'SUPPORT_MESSAGE_LANGUAGE');
+    assert.equal(error.status, 422);
+    assert.equal(toSupportError(error), error);
+
+    const response = toHttpResponse(error);
+    assert.equal(response.status, 422);
+    assert.deepEqual(Object.keys(response.body).sort(), ['codes', 'error']);
+    assert.deepEqual(response.body, {
+      codes: ['LANGUAGE_C01', 'LANGUAGE_C21'],
+      error: 'SUPPORT_MESSAGE_LANGUAGE',
+    });
+    assert.ok(Object.isFrozen(error.codes), 'the rule list is not a mutable copy');
   });
 
   it('answers with exactly one key and nothing else', () => {
